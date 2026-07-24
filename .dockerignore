@@ -1,0 +1,21 @@
+# Keep local state and secrets out of Docker build contexts. Production data is
+# mounted explicitly through volumes instead of being baked into an image.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+!.env.*.example
+.venv
+**/__pycache__
+**/*.py[cod]
+backend/db.sqlite3
+backend/media
+backend/staticfiles
+frontend/node_modules
+frontend/dist
+coverage
+htmlcov
+*.log
+.DS_Store
+

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /profile/
+Disallow: /my-travel
+Disallow: /login
+Disallow: /register
+

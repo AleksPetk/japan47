@@ -1,0 +1,17 @@
+{% extends "admin/change_form.html" %}
+
+{% block submit_buttons_bottom %}
+  {% if original and original.status == "pending" %}
+    <div class="submit-row j47-moderation-actions">
+      <input type="submit" value="Approve Changes" name="_approve_revision" class="default j47-approve-button">
+      <input type="submit" value="Reject Changes" name="_reject_revision" class="j47-reject-button">
+      <input type="submit" value="Save Review Note" name="_continue" class="j47-save-note-button">
+    </div>
+  {% elif original %}
+    <div class="j47-moderation-complete">
+      This revision is {{ original.get_status_display|lower }} and cannot be moderated again.
+    </div>
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+{% endblock %}

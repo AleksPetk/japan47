@@ -1,0 +1,7 @@
+{% comment %}Minimal Django 6.0 override; compare with core nav_sidebar.html on Django upgrades.{% endcomment %}
+{% load i18n admin_stats %}
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  <input type="search" id="nav-filter" placeholder="{% translate 'Start typing to filter…' %}" aria-label="{% translate 'Filter navigation items' %}">
+  {% japan47_admin_sidebar %}
+</nav>

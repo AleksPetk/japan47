@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<main class="j47-auth-card"><p class="j47-eyebrow">Protected administration</p><h1>Two-factor verification</h1><p>Enter the current code from Google Authenticator.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">{% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+    <label for="id_token">Six-digit code</label><input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
+    <button class="button default" type="submit">Verify</button>
+  </form><p><a href="{% url 'admin-2fa-recovery' %}?next={{ next|urlencode }}">Use a recovery code</a></p></main>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% load i18n %}
+{% for app in apps %}<div class="app-{{ app.app_label }} module"><table><caption><a href="{{ app.app_url }}" class="section">{{ app.name }}</a></caption>
+  {% for model in app.models %}<tr class="model-{{ model.object_name|lower }}{% if model.attention_count %} j47-needs-attention{% endif %}"><th scope="row">
+    <a class="j47-model-link" href="{{ model.admin_url }}">{{ model.name }}</a>
+    {% if model.attention_count %}<a class="j47-count" href="{{ model.attention_url }}" aria-label="{{ model.attention_count }} actionable {{ model.name|lower }}">{{ model.attention_count }}</a>{% endif %}
+    {% if model.reported_reviews or model.reported_places %}<span class="j47-report-breakdown">{% if model.reported_reviews %}{{ model.reported_reviews }} reported review{{ model.reported_reviews|pluralize }}{% endif %}{% if model.reported_reviews and model.reported_places %} · {% endif %}{% if model.reported_places %}{{ model.reported_places }} reported place{{ model.reported_places|pluralize }}{% endif %}</span>{% endif %}
+  </th></tr>{% endfor %}</table></div>{% empty %}<p>{% translate "You don’t have permission to view or edit anything." %}</p>{% endfor %}

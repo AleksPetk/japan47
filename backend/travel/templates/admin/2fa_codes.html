@@ -1,0 +1,9 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<main class="j47-auth-card"><p class="j47-eyebrow">Store offline</p><h1>Recovery codes</h1>
+  {% if recovery_codes %}<p><strong>These codes are shown once.</strong> Save them in a password manager or another secure offline location.</p><ul class="j47-recovery-codes">{% for code in recovery_codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+  {% else %}<p>Existing recovery codes cannot be displayed. You can invalidate them and generate a new set.</p>{% endif %}
+  <p><a class="button" href="{% url 'admin:index' %}">Continue to administration</a></p>
+  <form method="post">{% csrf_token %}<button class="button" type="submit">Regenerate recovery codes</button></form>
+</main>
+{% endblock %}

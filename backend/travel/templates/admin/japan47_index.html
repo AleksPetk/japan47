@@ -1,0 +1,9 @@
+{% extends "admin/index.html" %}
+{% load admin_stats %}
+
+{% block nav-sidebar %}{% include "admin/nav_sidebar.html" %}{% endblock %}
+
+{% block content %}
+  {% japan47_admin_stats %}
+  {{ block.super }}
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<main class="j47-auth-card"><p class="j47-eyebrow">Emergency access</p><h1>Use a recovery code</h1><p>Each recovery code works once.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">{% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+    <label for="id_token">Recovery code</label><input id="id_token" name="token" autocomplete="one-time-code" maxlength="16" required autofocus>
+    <button class="button default" type="submit">Verify recovery code</button>
+  </form><p><a href="{% url 'admin-2fa-verify' %}?next={{ next|urlencode }}">Use Google Authenticator</a></p></main>
+{% endblock %}

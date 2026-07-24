@@ -1,0 +1,4 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'travel/admin.css' %}">{% endblock %}
+{% block branding %}<div id="site-name"><a href="{% url 'admin:index' %}"><span>47</span> {{ site_header }}</a></div>{% endblock %}

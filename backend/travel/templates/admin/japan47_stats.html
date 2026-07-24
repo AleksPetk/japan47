@@ -1,0 +1,20 @@
+{% load i18n %}
+<section class="j47-dashboard" aria-labelledby="j47-dashboard-title">
+  <header><p class="j47-eyebrow">Moderation overview</p><h1 id="j47-dashboard-title">Needs Your Attention</h1></header>
+  <div class="j47-metric-grid j47-metric-grid--attention">
+    <a class="j47-metric{% if metrics.pending %} is-actionable{% endif %}" href="{% url 'admin:travel_place_changelist' %}?status__exact=pending"><span>Pending Places</span><strong>{{ metrics.pending }}</strong></a>
+    <a class="j47-metric{% if metrics.pending_revisions %} is-actionable{% endif %}" href="{% url 'admin:travel_placerevision_changelist' %}?status__exact=pending"><span>Pending Place Edits</span><strong>{{ metrics.pending_revisions }}</strong></a>
+    <a class="j47-metric{% if metrics.new_support %} is-actionable{% endif %}" href="{% url 'admin:travel_supportticket_changelist' %}?status__exact=new"><span>New Support Tickets</span><strong>{{ metrics.new_support }}</strong></a>
+    <a class="j47-metric{% if metrics.open_reports %} is-actionable{% endif %}" href="{% url 'admin:travel_contentreport_changelist' %}?status__exact=open"><span>Open Content Reports</span><strong>{{ metrics.open_reports }}</strong></a>
+    <a class="j47-metric{% if metrics.reported_reviews %} is-actionable{% endif %}" href="{% url 'admin:travel_contentreport_changelist' %}?status__exact=open&target=review"><span>Reported Reviews</span><strong>{{ metrics.reported_reviews }}</strong></a>
+    <a class="j47-metric{% if metrics.reported_places %} is-actionable{% endif %}" href="{% url 'admin:travel_contentreport_changelist' %}?status__exact=open&target=place"><span>Reported Places</span><strong>{{ metrics.reported_places }}</strong></a>
+  </div>
+  <h2>Community totals</h2>
+  <div class="j47-metric-grid">
+    <div class="j47-metric"><span>Published Places</span><strong>{{ metrics.published }}</strong></div><div class="j47-metric"><span>Rejected Places</span><strong>{{ metrics.rejected }}</strong></div>
+    <div class="j47-metric"><span>Total Reviews</span><strong>{{ metrics.total_reviews }}</strong><small>Average {{ metrics.average_rating }}/5</small></div><div class="j47-metric"><span>Total Users</span><strong>{{ metrics.total_users }}</strong><small>{{ metrics.users_today }} today · {{ metrics.users_week }} this week</small></div>
+    <div class="j47-metric"><span>Verified Users</span><strong>{{ metrics.verified_users }}</strong><small>{{ metrics.unverified_users }} unverified</small></div><div class="j47-metric"><span>Support Tickets</span><strong>{{ metrics.total_support }}</strong><small>{{ metrics.resolved_support }} resolved</small></div>
+    <div class="j47-metric"><span>Prefectures</span><strong>{{ metrics.total_prefectures }}</strong></div><div class="j47-metric"><span>Regions</span><strong>{{ metrics.total_regions }}</strong></div>
+  </div>
+  <p class="j47-security-link"><a href="{% url 'admin-2fa-codes' %}">Manage recovery codes</a></p>
+</section>

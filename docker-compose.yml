@@ -1,0 +1,116 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-japan47}
+      POSTGRES_USER: ${POSTGRES_USER:-japan47}
+      # Refuse to start with a known fallback password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ${POSTGRES_USER:-japan47} -d ${POSTGRES_DB:-japan47}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # Production receives one explicit source of configuration. Django itself
+    # never reads backend/.env inside this container.
+    env_file:
+      - ./.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      JAPAN47_ENV_SOURCE: root .env (Docker Compose)
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+      DJANGO_ADMIN_PATH: ${DJANGO_ADMIN_PATH:-j47-management/}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-japan47}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-japan47}
+      REDIS_URL: redis://redis:6379/1
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-False}
+      DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-False}
+      DJANGO_LOG_LEVEL: ${DJANGO_LOG_LEVEL:-INFO}
+      DJANGO_HSTS_SECONDS: ${DJANGO_HSTS_SECONDS:-31536000}
+      JWT_ACCESS_MINUTES: ${JWT_ACCESS_MINUTES:-15}
+      JWT_REFRESH_DAYS: ${JWT_REFRESH_DAYS:-7}
+      API_ANON_THROTTLE: ${API_ANON_THROTTLE:-120/hour}
+      API_USER_THROTTLE: ${API_USER_THROTTLE:-1000/hour}
+      AUTH_THROTTLE: ${AUTH_THROTTLE:-10/minute}
+      VERIFICATION_RESEND_THROTTLE: ${VERIFICATION_RESEND_THROTTLE:-5/hour}
+      PASSWORD_RESET_THROTTLE: ${PASSWORD_RESET_THROTTLE:-5/hour}
+      ACCOUNT_EMAIL_COOLDOWN_SECONDS: ${ACCOUNT_EMAIL_COOLDOWN_SECONDS:-60}
+      SUPPORT_THROTTLE: ${SUPPORT_THROTTLE:-5/hour}
+      SUPPORT_DUPLICATE_MINUTES: ${SUPPORT_DUPLICATE_MINUTES:-10}
+      CACHE_DEFAULT_TIMEOUT: ${CACHE_DEFAULT_TIMEOUT:-300}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set RESEND_API_KEY in .env}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Japan47 <noreply@japan47.alekspetk.com>}
+      EMAIL_VERIFICATION_TOKEN_MAX_AGE: ${EMAIL_VERIFICATION_TOKEN_MAX_AGE:-86400}
+      PASSWORD_RESET_TOKEN_MAX_AGE: ${PASSWORD_RESET_TOKEN_MAX_AGE:-3600}
+      SERVER_EMAIL: ${SERVER_EMAIL:-server@japan47.example}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+    # The image entrypoint applies schema migrations and collects admin assets.
+    # Existing data is restored explicitly; container restarts never re-import it.
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+        VITE_PUBLIC_URL: ${VITE_PUBLIC_URL:-http://localhost}
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.29-alpine
+    ports: ["${HTTP_PORT:-80}:80"]
+    environment:
+      DJANGO_ADMIN_PATH: ${DJANGO_ADMIN_PATH:-j47-management/}
+      NGINX_ENVSUBST_FILTER: DJANGO_ADMIN_PATH
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - media_data:/var/www/media:ro
+      - static_data:/var/www/static:ro
+    depends_on:
+      backend: { condition: service_healthy }
+      frontend: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
+  static_data:

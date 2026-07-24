@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<main class="j47-auth-card">
+  <p class="j47-eyebrow">Mandatory staff security</p>
+  <h1>Set up Google Authenticator</h1>
+  <ol><li>Open Google Authenticator.</li><li>Scan this QR code.</li><li>Enter the current six-digit code.</li></ol>
+  <img class="j47-qr" src="{{ qr_data_url }}" alt="Google Authenticator setup QR code">
+  <form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+    {% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+    <label for="id_token">Six-digit code</label><input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
+    <button class="button default" type="submit">Confirm enrollment</button>
+  </form>
+</main>
+{% endblock %}
