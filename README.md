@@ -69,7 +69,7 @@ The copied SQLite database and all existing uploads remain in `backend/`. Produc
 - Python 3.12 or newer (the migrated copy was verified with 3.14.0)
 - Node 20.19+ or 22.12+ (verified with 24.18.0)
 - npm (verified with 11.16.0)
-- Docker with Compose for the production-style stack
+- Docker with Compose for local full-stack testing and VPS deployment
 
 PostgreSQL is supplied by Docker; local development defaults to the preserved SQLite database.
 
@@ -127,7 +127,9 @@ continues to use its explicit domain allowlists.
 
 ## Environment variables
 
-Copy `.env.example` for Docker or `backend/.env.example` for local Django. Never commit a real `.env`.
+Use `.env.example` for local Docker, `.env.production.example` for the VPS, or
+`backend/.env.example` for local Django/runserver. Copy the appropriate template
+to its ignored `.env` location and never commit a real `.env`.
 
 | Variable | Purpose |
 |---|---|
@@ -223,19 +225,23 @@ privileges removed by another authorized administrator.
 
 ### Resend setup
 
-1. Open `backend/.env` for local Django or the root `.env` used by Docker.
+1. Open `backend/.env` for local Django/runserver or the root `.env` used by Docker.
 2. Set `DJANGO_SECRET_KEY` and `RESEND_API_KEY` without committing either file.
 3. Verify `japan47.alekspetk.com` in Resend and keep `DEFAULT_FROM_EMAIL=Japan47 <noreply@japan47.alekspetk.com>`.
 4. Configure both public origins. Verification and password-reset links use the React origin because their landing pages are React routes:
 
    ```env
-   # Local Mac browser
+   # Local runserver + Vite on the Mac
    FRONTEND_URL=http://localhost:5173
    BACKEND_URL=http://localhost:8000
 
-   # Same-Wi-Fi phone testing (replace with the Mac's current LAN address)
+   # Local runserver + Vite from a phone (replace with the Mac LAN address)
    FRONTEND_URL=http://192.168.1.25:5173
    BACKEND_URL=http://192.168.1.25:8000
+
+   # Local Docker through its public Nginx port (no port 8000)
+   FRONTEND_URL=http://192.168.0.206
+   BACKEND_URL=http://192.168.0.206
 
    # Production behind Nginx
    FRONTEND_URL=https://japan47.alekspetk.com
@@ -358,22 +364,29 @@ npm run build
 
 The backend suite covers serializers through endpoint behavior, verification-aware auth/refresh, signed token expiry and reuse, case-insensitive email uniqueness, generic recovery responses, Resend request construction, password changes, permissions, moderation, CRUD, throttling, uploads, and admin behavior. Frontend tests cover registration confirmation, unverified login guidance, verification results, forgot/reset password, protected contact routing, loading, errors, and submissions.
 
-## Docker deployment
+## Local Docker and VPS deployment
+
+### Local Docker on Mac and phone
 
 ```bash
 cp .env.example .env
-# Replace every placeholder and use the real HTTPS domain in .env
-docker compose config
-docker compose up --build
+# Replace secret placeholders. If the Mac LAN IP changed, update all LAN values.
+docker compose config --quiet
+docker compose up -d --build
 ```
 
-Open `http://localhost` (or the configured `HTTP_PORT`). Useful commands:
+Open `http://localhost` on the Mac or `http://192.168.0.206` on a phone connected
+to the same Wi-Fi. Docker uses `config.settings.docker_local`, PostgreSQL, and
+the root `.env`; it never reads `backend/.env`. Emailed React links use the LAN
+origin, so they open from either device. If the Mac IP changes, update root
+`.env` and recreate the stack.
+
+Useful commands:
 
 ```bash
 docker compose ps
 docker compose logs -f backend nginx
-docker compose exec backend python manage.py check --deploy
-docker compose exec backend python manage.py test
+docker compose exec backend python manage.py check
 docker compose exec backend python manage.py createsuperuser
 docker compose exec db pg_dump -U japan47 -d japan47 -Fc -f /tmp/japan47.dump
 docker compose down
@@ -381,13 +394,23 @@ docker compose down
 
 `docker compose down` preserves named volumes. `docker compose down -v` destroys PostgreSQL and persistent media and should only be used intentionally after a backup.
 
-For HTTPS, place a TLS-aware load balancer in front or add certificate/listen configuration to Nginx, then set `DJANGO_SECURE_SSL_REDIRECT=True`, `DJANGO_SECURE_COOKIES=True`, use HTTPS origins, and enable secure deployment hosts. The Compose example defaults secure cookies off only so Django admin can be tested over local HTTP; production settings default them on when the variable is omitted.
+### VPS production
+
+On the VPS, copy `.env.production.example` to the ignored root `.env`, replace
+every secret placeholder, and keep the production domain/HTTPS allowlists. The
+template explicitly selects `config.settings.production`; those settings fail
+closed when the secret key, PostgreSQL, Resend, or HTTPS origins are invalid.
+Never use localhost or a LAN address in the VPS `.env`.
+
+Place a TLS-aware load balancer in front or add certificate/listen configuration
+to Nginx before enabling public traffic. Production enables secure redirects,
+cookies, and HSTS independently from local Docker.
 
 ### Hetzner deployment handoff
 
 1. Create a VPS, restrict SSH to keys, enable a firewall for ports 22, 80, and 443, and install Docker Engine plus its Compose plugin.
 2. Point the chosen domain's A/AAAA records at the VPS. The domain name and DNS credentials are intentionally not stored in this repository.
-3. Clone the repository, copy `.env.example` to `.env`, replace every placeholder, set all public URLs to the HTTPS domain, and run the PostgreSQL cutover in `POSTGRES_MIGRATION.md`.
+3. Clone the repository, copy `.env.production.example` to `.env`, replace every placeholder, and run the PostgreSQL cutover in `POSTGRES_MIGRATION.md`.
 4. Put a TLS terminator such as Hetzner Load Balancer, Caddy, or a Certbot-managed Nginx listener in front of this HTTP stack. Only enable Django's secure redirect/cookies after HTTPS is reachable.
 5. Run `docker compose up -d --build`, then execute the deploy checks and manual smoke test below.
 
@@ -445,14 +468,15 @@ The mobile client therefore needs no Django rewrite or React-specific response p
 ├── docker-compose.yml
 ├── MIGRATION_CHECKLIST.md
 ├── POSTGRES_MIGRATION.md
-└── .env.example
+├── .env.example              # ignored local-Docker .env template
+└── .env.production.example   # safe VPS template; contains no real secrets
 ```
 
 ## Known limitations
 
 - Image processing currently uses filesystem paths and the production stack intentionally uses a persistent local media volume. Object storage would require a storage-compatible image processing refactor.
 - The legal text remains project-provided informational text; obtain professional legal review before a public commercial launch.
-- Docker is not installed on the development machine used for this pass, so Compose config, PostgreSQL volume persistence, Nginx proxy behavior, and live HTTPS must be smoke-tested on the VPS using the commands above.
+- Live TLS termination and VPS firewall/DNS behavior still require a deployment smoke test on the actual server.
 - Buying/configuring a domain, recording a demo video, taking final deployment screenshots, publishing to a GitHub portfolio, and editing a CV require the owner's accounts and final deployed URL; the repository cannot perform those external actions safely.
 
 ## Future roadmap

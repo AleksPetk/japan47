@@ -11,6 +11,9 @@ COPY backend/ /app/
 RUN chmod +x /app/docker-entrypoint.sh && mkdir -p /app/staticfiles /app/media && chown -R django:django /app
 USER django
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/', timeout=3)"
+# The probe runs inside the container, but production deliberately rejects
+# 127.0.0.1 may not be a trusted public host. Reuse BACKEND_URL's configured
+# host and scheme so the same probe works in Docker-local and production.
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import os, urllib.parse, urllib.request; origin = urllib.parse.urlsplit(os.environ['BACKEND_URL']); request = urllib.request.Request('http://127.0.0.1:8000/api/v1/health/', headers={'Host': origin.netloc, 'X-Forwarded-Proto': origin.scheme}); urllib.request.urlopen(request, timeout=3)"
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", "--access-logfile", "-"]
