@@ -22,10 +22,35 @@ function seoFiles(publicUrl) {
   }
 }
 
+// Analytics is injected into the built document only for production builds,
+// keeping local development and test sessions out of the production metrics.
+function umamiAnalytics(enabled) {
+  return {
+    name: 'japan47-umami-analytics',
+    transformIndexHtml() {
+      if (!enabled) return []
+
+      return [{
+        tag: 'script',
+        attrs: {
+          defer: true,
+          src: 'https://analytics.alekspetk.com/script.js',
+          'data-website-id': '9e7fe0cd-c220-4850-8808-fe033aa13d74',
+        },
+        injectTo: 'head',
+      }]
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '')
   return {
-  plugins: [react(), seoFiles(env.VITE_PUBLIC_URL || 'http://localhost:5173')],
+  plugins: [
+    react(),
+    seoFiles(env.VITE_PUBLIC_URL || 'http://localhost:5173'),
+    umamiAnalytics(mode === 'production'),
+  ],
   server: {
     host: '0.0.0.0',
     port: 5173,
