@@ -30,7 +30,13 @@ export function AuthProvider({ children }) {
     try { if (refresh) await api('/auth/logout/', { method: 'POST', body: jsonBody({ refresh }) }) } finally { tokenStore.clear(); setUser(null) }
   }
 
-  const value = { user, loading, login, register, logout, reloadUser: loadUser }
+  const clearAuth = useCallback(() => {
+    tokenStore.clear()
+    setUser(null)
+    setLoading(false)
+  }, [])
+
+  const value = { user, loading, login, register, logout, clearAuth, reloadUser: loadUser }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

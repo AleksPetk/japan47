@@ -1,9 +1,51 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, override_settings
+from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from travel.accounts.email_service import send_password_reset_message, send_verification_message
+from travel.accounts.services import request_password_reset_email, send_verification_email
+
+User = get_user_model()
+
+
+class AccountEmailLinkTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "email-link-user",
+            "email-link-user@example.com",
+            "StrongPass123!",
+        )
+
+    def assert_action_links_use_frontend(self, frontend_url, backend_url):
+        with override_settings(FRONTEND_URL=frontend_url, BACKEND_URL=backend_url):
+            with patch("travel.accounts.services.send_verification_message") as verification:
+                self.assertTrue(send_verification_email(self.user))
+            verification_url = verification.call_args.kwargs["verification_url"]
+
+            with patch("travel.accounts.services.send_password_reset_message") as password_reset:
+                self.assertTrue(request_password_reset_email(self.user.email))
+            reset_url = password_reset.call_args.kwargs["reset_url"]
+
+        self.assertTrue(verification_url.startswith(f"{frontend_url}/verify-email/"))
+        self.assertTrue(reset_url.startswith(f"{frontend_url}/reset-password/"))
+        self.assertNotIn(backend_url, verification_url)
+        self.assertNotIn(backend_url, reset_url)
+
+    def test_lan_development_action_links_use_configured_frontend(self):
+        self.assert_action_links_use_frontend(
+            "http://192.168.1.25:5173",
+            "http://192.168.1.25:8000",
+        )
+
+    def test_production_action_links_use_configured_frontend(self):
+        # Use a distinct backend host here so the assertion proves that these
+        # React-owned landing routes do not accidentally use the API origin.
+        self.assert_action_links_use_frontend(
+            "https://japan47.alekspetk.com",
+            "https://api.japan47.alekspetk.com",
+        )
 
 
 class ResendEmailServiceTests(SimpleTestCase):

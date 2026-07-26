@@ -4,6 +4,7 @@ import os
 import re
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
@@ -20,6 +21,23 @@ def env_bool(name, default=False):
 
 def env_list(name, default=""):
     return [value.strip() for value in os.getenv(name, default).split(",") if value.strip()]
+
+
+def env_base_url(name, default):
+    """Load one public HTTP(S) origin and remove only its trailing slash."""
+
+    value = (os.getenv(name) or default).strip().rstrip("/")
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ImproperlyConfigured(f"{name} must be a valid public HTTP(S) base URL.")
+    return value
 
 
 def normalized_admin_path(value):
@@ -139,7 +157,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:5173")
 CORS_ALLOW_CREDENTIALS = False
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+FRONTEND_URL = env_base_url("FRONTEND_URL", "http://localhost:5173")
+BACKEND_URL = env_base_url("BACKEND_URL", "http://localhost:8000")
 OTP_TOTP_ISSUER = "Japan 47 administration"
 
 REST_FRAMEWORK = {
@@ -168,6 +187,7 @@ REST_FRAMEWORK = {
         "support": os.getenv("SUPPORT_THROTTLE", "5/hour"),
         "verification_resend": os.getenv("VERIFICATION_RESEND_THROTTLE", "5/hour"),
         "password_reset": os.getenv("PASSWORD_RESET_THROTTLE", "5/hour"),
+        "account_deletion": os.getenv("ACCOUNT_DELETION_THROTTLE", "5/hour"),
     },
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
@@ -175,6 +195,12 @@ REST_FRAMEWORK = {
 # Prevent rapid duplicate requests even when the general throttle has capacity.
 SUPPORT_DUPLICATE_MINUTES = int(os.getenv("SUPPORT_DUPLICATE_MINUTES", "10"))
 ACCOUNT_EMAIL_COOLDOWN_SECONDS = int(os.getenv("ACCOUNT_EMAIL_COOLDOWN_SECONDS", "60"))
+
+# Registration records the exact legal text accepted by each new account.
+# Incrementing either value later enables a deliberate re-consent flow without
+# rewriting or falsely backfilling historical consent.
+CURRENT_TERMS_VERSION = "2026-07-26"
+CURRENT_PRIVACY_POLICY_VERSION = "2026-07-26"
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("JWT_ACCESS_MINUTES", "15"))),

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import FormField from '../components/FormField'
+import { fieldError } from '../utils/format'
 
 function safeReturnPath(value) {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/'
@@ -12,7 +13,7 @@ function AuthShell({ mode }) {
   const { user, login, register } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const [values, setValues] = useState({ username: '', email: '', password: '', password2: '' })
+  const [values, setValues] = useState({ username: '', email: '', password: '', password2: '', legal_consent: false })
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [emailNotVerified, setEmailNotVerified] = useState(false)
@@ -21,7 +22,8 @@ function AuthShell({ mode }) {
   if (user) return <Navigate to={returnPath} replace />
 
   const change = (event) => {
-    setValues((current) => ({ ...current, [event.target.name]: event.target.value }))
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
+    setValues((current) => ({ ...current, [event.target.name]: value }))
     setErrors({})
     setEmailNotVerified(false)
   }
@@ -58,6 +60,11 @@ function AuthShell({ mode }) {
       {registering && <FormField label="Email" name="email" errors={errors} required><input id="email" name="email" type="email" autoComplete="email" value={values.email} onChange={change} required /></FormField>}
       <FormField label="Password" name="password" errors={errors} required><input id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} value={values.password} onChange={change} required /></FormField>
       {registering && <FormField label="Confirm password" name="password2" errors={errors} required><input id="password2" name="password2" type="password" autoComplete="new-password" value={values.password2} onChange={change} required /></FormField>}
+      {registering && <div className="consent-field">
+        <input id="legal_consent" name="legal_consent" type="checkbox" checked={values.legal_consent} onChange={change} required />
+        <label htmlFor="legal_consent">I agree to the <Link to="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</Link> and <Link to="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>.</label>
+        {fieldError(errors, 'legal_consent') && <p className="field-error" id="legal_consent-error">{fieldError(errors, 'legal_consent')}</p>}
+      </div>}
       {!registering && <Link className="auth-card__forgot" to="/forgot-password">Forgot password?</Link>}
       <button className="button button--primary button--full" disabled={busy}>{busy ? 'Please wait…' : registering ? 'Register' : 'Login'}</button>
     </form>

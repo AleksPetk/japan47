@@ -10,7 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from travel.accounts.email_service import EmailDeliveryError
-from travel.accounts.services import mask_email, send_verification_email
+from travel.accounts.services import delete_user_account, mask_email, send_verification_email
 from travel.models import Follow, Place, Profile, Review
 from travel.services import annotate_places_with_ratings, personalize_places
 
@@ -19,7 +19,12 @@ from ..serializers import (
     ProfileSerializer,
     RegistrationSerializer,
 )
-from ..account_serializers import VerifiedTokenObtainPairSerializer, VerifiedTokenRefreshSerializer
+from ..account_serializers import (
+    AccountDeletionSerializer,
+    PasswordVerificationSerializer,
+    VerifiedTokenObtainPairSerializer,
+    VerifiedTokenRefreshSerializer,
+)
 
 User = get_user_model()
 
@@ -200,3 +205,28 @@ class LogoutView(generics.GenericAPIView):
         response = JsonResponse({}, status=204)
         response.content = b""
         return response
+
+
+class VerifyCurrentPasswordView(generics.GenericAPIView):
+    serializer_class = PasswordVerificationSerializer
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "account_deletion"
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return JsonResponse({"verified": True})
+
+
+class DeleteAccountView(generics.GenericAPIView):
+    serializer_class = AccountDeletionSerializer
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "account_deletion"
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        delete_user_account(request.user)
+        return JsonResponse({"message": "Your account has been permanently deleted."})

@@ -77,6 +77,36 @@ class EmailVerificationSerializer(serializers.Serializer):
     token = serializers.CharField(write_only=True, trim_whitespace=False, max_length=2000)
 
 
+class PasswordVerificationSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("The current password is incorrect.")
+        return value
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if user.is_staff or user.is_superuser:
+            raise serializers.ValidationError({
+                "account": (
+                    "Staff or superuser privileges must first be removed "
+                    "by another authorized administrator."
+                )
+            })
+        return attrs
+
+
+class AccountDeletionSerializer(PasswordVerificationSerializer):
+    confirmation = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_confirmation(self, value):
+        if value != "DELETE":
+            raise serializers.ValidationError('Type "DELETE" exactly to confirm account deletion.')
+        return value
+
+
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField(write_only=True, max_length=128)
     token = serializers.CharField(write_only=True, trim_whitespace=False, max_length=256)

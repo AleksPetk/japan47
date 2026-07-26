@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function SiteLayout() {
   const [open, setOpen] = useState(false)
-  const { user, logout } = useAuth()
+  const { user, logout, clearAuth } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   useEffect(() => {
@@ -26,6 +26,11 @@ export default function SiteLayout() {
     }
     structuredData.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Japan 47', url: window.location.origin, potentialAction: { '@type': 'SearchAction', target: `${window.location.origin}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' } })
   }, [location.pathname])
+  useEffect(() => {
+    // Account deletion navigates to this public route before clearing the
+    // context, preventing the old protected route from redirecting to login.
+    if (location.state?.accountDeleted) clearAuth()
+  }, [clearAuth, location.state?.accountDeleted])
   const close = () => setOpen(false)
   const handleLogout = async () => {
     close()
@@ -47,6 +52,7 @@ export default function SiteLayout() {
         {user ? <><NavLink onClick={close} to="/my-travel">My travel</NavLink><NavLink className="nav__user" onClick={close} to={`/contributors/${user.id}`}>{user.profile_image_url ? <img src={user.profile_image_url} alt="" /> : <span>{user.display_name[0]}</span>}{user.display_name}</NavLink><button onClick={handleLogout}>Logout</button></> : <><NavLink onClick={close} to="/login">Login</NavLink><NavLink className="nav__accent" onClick={close} to="/register">Register</NavLink></>}
       </nav>
     </header>
+    {location.state?.successMessage && <div className="site-notice" role="status">{location.state.successMessage}</div>}
     <main id="main"><Outlet /></main>
     <footer><nav aria-label="Support and legal"><Link to="/contact">Contact Us</Link><Link to="/privacy">Privacy Policy</Link><Link to="/terms">Terms of Use</Link></nav><p>© {new Date().getFullYear()} Japan 47. All rights reserved.</p><small>Created by Aleks Petk</small></footer>
   </div>

@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from travel.models import (
@@ -160,7 +161,7 @@ class PlaceRevisionSerializer(serializers.ModelSerializer):
 class PlaceListSerializer(serializers.ModelSerializer):
     image_url = AbsoluteImageField(source="image", read_only=True)
     prefecture = PrefectureSummarySerializer(read_only=True)
-    author = UserSummarySerializer(read_only=True)
+    author = serializers.SerializerMethodField()
     average_rating = serializers.FloatField(read_only=True, allow_null=True)
     review_count = serializers.IntegerField(read_only=True)
     can_edit = serializers.SerializerMethodField()
@@ -169,7 +170,16 @@ class PlaceListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Place
-        fields = ("id", "name", "slug", "description", "image_url", "city", "best_season", "status", "created_at", "updated_at", "average_rating", "review_count", "prefecture", "author", "can_edit", "is_favorite", "is_visited")
+        fields = ("id", "name", "slug", "description", "image_url", "city", "best_season", "status", "is_platform_managed", "created_at", "updated_at", "average_rating", "review_count", "prefecture", "author", "can_edit", "is_favorite", "is_visited")
+
+    def get_author(self, obj) -> dict:
+        if obj.author_id:
+            return UserSummarySerializer(obj.author, context=self.context).data
+        return {
+            "id": None,
+            "display_name": "Japan47 Community",
+            "profile_image_url": None,
+        }
 
     def get_can_edit(self, obj) -> bool:
         user = self.context["request"].user
@@ -369,10 +379,11 @@ class ProfileSerializer(serializers.ModelSerializer):
 class RegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     password2 = serializers.CharField(write_only=True, trim_whitespace=False)
+    legal_consent = serializers.BooleanField(write_only=True, required=True)
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "password", "password2")
+        fields = ("id", "username", "email", "password", "password2", "legal_consent")
         extra_kwargs = {"email": {"required": True}}
 
     def validate_username(self, value):
@@ -389,15 +400,26 @@ class RegistrationSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if attrs["password"] != attrs["password2"]:
             raise serializers.ValidationError({"password2": "Passwords do not match."})
+        if attrs["legal_consent"] is not True:
+            raise serializers.ValidationError({
+                "legal_consent": "You must agree to the Terms of Use and Privacy Policy."
+            })
         validate_password(attrs["password"])
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         validated_data.pop("password2")
+        validated_data.pop("legal_consent")
         validated_data["username"] = normalize_username(validated_data["username"])
         validated_data["email"] = normalize_email(validated_data["email"])
-        return User.objects.create_user(**validated_data)
+        user = User.objects.create_user(**validated_data)
+        Profile.objects.filter(user=user).update(
+            terms_accepted_version=settings.CURRENT_TERMS_VERSION,
+            privacy_accepted_version=settings.CURRENT_PRIVACY_POLICY_VERSION,
+            legal_accepted_at=timezone.now(),
+        )
+        return user
 
 
 class HealthSerializer(serializers.Serializer):

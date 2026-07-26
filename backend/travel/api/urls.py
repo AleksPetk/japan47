@@ -19,10 +19,12 @@ from .views.accounts import PasswordResetConfirmView, PasswordResetRequestView, 
 from .views.users import (
     ContributorDetailView,
     CurrentProfileView,
+    DeleteAccountView,
     LogoutView,
     RegistrationView,
     ThrottledTokenObtainPairView,
     VerifiedTokenRefreshView,
+    VerifyCurrentPasswordView,
 )
 
 router = DefaultRouter()
@@ -50,6 +52,8 @@ urlpatterns = [
     path("auth/login/", ThrottledTokenObtainPairView.as_view(), name="token-obtain"),
     path("auth/refresh/", VerifiedTokenRefreshView.as_view(), name="token-refresh"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
+    path("auth/account/verify-password/", VerifyCurrentPasswordView.as_view(), name="verify-current-password"),
+    path("auth/account/delete/", DeleteAccountView.as_view(), name="delete-account"),
     path("auth/verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path("auth/resend-verification/", ResendVerificationView.as_view(), name="resend-verification"),
     path("auth/password-reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -95,7 +95,7 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
     await userEvent.click(screen.getByRole('button', { name: 'Login' }))
     expect(await screen.findByRole('heading', { name: 'Contact Us' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Contact email')).toHaveValue('aiko@example.com')
+    await waitFor(() => expect(screen.getByLabelText('Contact email')).toHaveValue('aiko@example.com'))
   })
 
   it('reviews values before submitting the support request and shows its reference', async () => {
@@ -137,10 +137,59 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('Email'), 'sakura@example.com')
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPass123!')
+    const registrationForm = screen.getByRole('button', { name: 'Register' }).closest('form')
+    expect(within(registrationForm).getByRole('link', { name: 'Terms of Use' })).toHaveAttribute('target', '_blank')
+    expect(within(registrationForm).getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('rel', 'noopener noreferrer')
+    await userEvent.click(screen.getByLabelText(/I agree to the Terms of Use/))
     await userEvent.click(screen.getByRole('button', { name: 'Register' }))
     expect(await screen.findByRole('heading', { name: 'Thank You for Registering' })).toBeInTheDocument()
     expect(screen.getByText(/sa\*\*\*\*@example.com/)).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/auth/login/'), expect.anything())
+    const registerCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/register/'))
+    expect(JSON.parse(registerCall[1].body)).toMatchObject({ legal_consent: true })
+  })
+
+  it('does not submit registration until legal consent is checked', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => json({}))
+    renderRoute('/register')
+    await userEvent.type(screen.getByLabelText('Username'), 'sakura')
+    await userEvent.type(screen.getByLabelText('Email'), 'sakura@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPass123!')
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }))
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(/I agree to the Terms of Use/)).not.toBeChecked()
+  })
+
+  it('requires all account-deletion confirmations, clears auth, and redirects home', async () => {
+    tokenStore.set({ access: 'access-token', refresh: 'refresh-token' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).endsWith('/profile/')) return json({ id: 7, display_name: 'Sakura', nickname: 'Sakura', email: 'sakura@example.com', email_verified: true, profile_image_url: null })
+      if (String(url).endsWith('/auth/account/verify-password/')) return json({ verified: true })
+      if (String(url).endsWith('/auth/account/delete/')) return json({ message: 'Your account has been permanently deleted.' })
+      if (String(url).endsWith('/home/')) return json({ stats: {}, latest_places: [], top_places: [], top_prefectures: [], top_regions: [], top_contributors: [] })
+      if (String(url).endsWith('/places/trending/')) return json({ results: [] })
+      return json({})
+    })
+    renderRoute('/profile/edit')
+    expect(await screen.findByRole('heading', { name: 'Edit profile' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Nothing will be deleted')
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await userEvent.type(screen.getByLabelText('Current password'), 'StrongPass123!')
+    await userEvent.click(screen.getByRole('button', { name: 'Verify password' }))
+    expect(await screen.findByText(/Japan47 Community/)).toBeInTheDocument()
+    const finalButton = screen.getByRole('button', { name: 'Permanently delete account' })
+    expect(finalButton).toBeDisabled()
+    await userEvent.type(screen.getByLabelText(/Type "DELETE"/), 'DELETE')
+    const enabledFinalButton = screen.getByRole('button', { name: 'Permanently delete account' })
+    expect(enabledFinalButton).toBeEnabled()
+    await userEvent.click(enabledFinalButton)
+    expect(await screen.findByRole('heading', { name: /Discover Japan/ })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Your account has been permanently deleted.')
+    expect(tokenStore.get()).toBeNull()
+    const deleteCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/account/delete/'))
+    expect(JSON.parse(deleteCall[1].body)).toEqual({ password: 'StrongPass123!', confirmation: 'DELETE' })
   })
 
   it('shows a resend action when valid credentials belong to an unverified account', async () => {

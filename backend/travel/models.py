@@ -242,9 +242,12 @@ class Place(models.Model):
 
     author = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="places",
+        blank=True,
+        null=True,
     )
+    is_platform_managed = models.BooleanField(default=False, db_index=True)
     prefecture = models.ForeignKey(
         Prefecture,
         on_delete=models.PROTECT,
@@ -354,8 +357,10 @@ class PlaceRevision(models.Model):
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="revisions")
     submitted_by = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="submitted_place_revisions",
+        blank=True,
+        null=True,
     )
     prefecture = models.ForeignKey(Prefecture, on_delete=models.PROTECT, related_name="place_revisions")
     name = models.CharField(max_length=120)
@@ -554,6 +559,9 @@ class Profile(models.Model):
     email_verification_nonce = models.UUIDField(default=uuid.uuid4, editable=False)
     email_verification_sent_at = models.DateTimeField(blank=True, null=True)
     password_reset_sent_at = models.DateTimeField(blank=True, null=True)
+    terms_accepted_version = models.CharField(max_length=32, blank=True, null=True)
+    privacy_accepted_version = models.CharField(max_length=32, blank=True, null=True)
+    legal_accepted_at = models.DateTimeField(blank=True, null=True)
     profile_image = models.ImageField(
         upload_to=profile_image_upload_path,
         blank=True,
@@ -636,7 +644,13 @@ class ContentReport(models.Model):
         RESOLVED = "resolved", "Resolved"
         DISMISSED = "dismissed", "Dismissed"
 
-    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name="content_reports")
+    reporter = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="content_reports",
+        blank=True,
+        null=True,
+    )
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="reports", blank=True, null=True)
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="reports", blank=True, null=True)
     reason = models.CharField(max_length=500)

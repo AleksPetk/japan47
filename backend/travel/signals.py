@@ -2,6 +2,7 @@ import uuid
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
@@ -40,8 +41,12 @@ def create_profile_for_new_user(sender, instance, created, **kwargs):
 def delete_profile_image(sender, instance, **kwargs):
     if instance.profile_image:
         storage = instance.profile_image.storage
-        if storage.exists(instance.profile_image.name):
-            storage.delete(instance.profile_image.name)
+        name = instance.profile_image.name
+        # File deletion cannot be rolled back. Delay it until the database
+        # transaction succeeds so a failed account deletion preserves media.
+        transaction.on_commit(
+            lambda: storage.delete(name) if storage.exists(name) else None
+        )
 
 
 @receiver(post_delete, sender=PlaceImage)

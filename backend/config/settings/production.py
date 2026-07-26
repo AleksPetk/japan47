@@ -25,6 +25,8 @@ if not RESEND_API_KEY:  # noqa: F405
     raise ImproperlyConfigured("RESEND_API_KEY must be configured in production.")
 if not FRONTEND_URL.startswith("https://"):  # noqa: F405
     raise ImproperlyConfigured("Production FRONTEND_URL must use HTTPS.")
+if not BACKEND_URL.startswith("https://"):  # noqa: F405
+    raise ImproperlyConfigured("Production BACKEND_URL must use HTTPS.")
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", True)  # noqa: F405

@@ -138,12 +138,14 @@ Copy `.env.example` for Docker or `backend/.env.example` for local Django. Never
 | `DATABASE_URL` | SQLite or PostgreSQL URL |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins |
 | `CSRF_TRUSTED_ORIGINS` | Trusted origins for admin/session tools |
-| `FRONTEND_URL` | Public React origin used for frontend-owned asset URLs |
+| `FRONTEND_URL` | Public React origin used for emailed action links and frontend-owned assets |
+| `BACKEND_URL` | Public Django origin for backend/API links; normally the same production domain |
 | `VITE_PUBLIC_URL` | Public origin compiled into `sitemap.xml` and `robots.txt` |
 | `JWT_ACCESS_MINUTES` / `JWT_REFRESH_DAYS` | JWT lifetimes |
 | `API_ANON_THROTTLE` / `API_USER_THROTTLE` | General API rates |
 | `AUTH_THROTTLE` | Sensitive authentication endpoint rate |
 | `VERIFICATION_RESEND_THROTTLE` / `PASSWORD_RESET_THROTTLE` | Enumeration-safe email endpoint rates |
+| `ACCOUNT_DELETION_THROTTLE` | Current-password verification and account-deletion attempt rate |
 | `ACCOUNT_EMAIL_COOLDOWN_SECONDS` | Per-account delay between transactional emails |
 | `SUPPORT_THROTTLE` | Per-user support endpoint rate, default `5/hour` |
 | `SUPPORT_DUPLICATE_MINUTES` | Window used to reject repeated identical support requests |
@@ -204,12 +206,45 @@ The API uses short-lived JWT access tokens plus rotating refresh tokens with bla
 
 Existing accounts are marked verified by migration `0011`, preserving access. New and changed email addresses require confirmation. Email addresses are normalized and protected by a case-insensitive database index. Verification links use Django timestamp signing and a rotating nonce; reset links use Django's password-reset generator and become invalid after a password change. Recovery responses are intentionally generic to prevent account enumeration.
 
+New registrations must explicitly accept the current Terms of Use and Privacy
+Policy. Django records each accepted policy version and the shared acceptance
+timestamp on the profile; existing accounts are intentionally left with null
+consent fields. A future forced re-consent flow can compare those stored
+versions with `CURRENT_TERMS_VERSION` and `CURRENT_PRIVACY_POLICY_VERSION`, then
+restrict only the features that require a newer acceptance until the user opts
+in. That comparison is deliberately not enforced in this release.
+
+Authenticated users can permanently delete their own account from profile
+settings after password verification and an exact `DELETE` confirmation. JWT
+refresh tokens and Django sessions are invalidated, personal travel/community
+data is removed, and submitted places remain as platform-managed content under
+“Japan47 Community.” Staff and superuser accounts must first have their elevated
+privileges removed by another authorized administrator.
+
 ### Resend setup
 
 1. Open `backend/.env` for local Django or the root `.env` used by Docker.
 2. Set `DJANGO_SECRET_KEY` and `RESEND_API_KEY` without committing either file.
 3. Verify `japan47.alekspetk.com` in Resend and keep `DEFAULT_FROM_EMAIL=Japan47 <noreply@japan47.alekspetk.com>`.
-4. Use `FRONTEND_URL=http://localhost:5173` locally and `FRONTEND_URL=https://japan47.alekspetk.com` in production.
+4. Configure both public origins. Verification and password-reset links use the React origin because their landing pages are React routes:
+
+   ```env
+   # Local Mac browser
+   FRONTEND_URL=http://localhost:5173
+   BACKEND_URL=http://localhost:8000
+
+   # Same-Wi-Fi phone testing (replace with the Mac's current LAN address)
+   FRONTEND_URL=http://192.168.1.25:5173
+   BACKEND_URL=http://192.168.1.25:8000
+
+   # Production behind Nginx
+   FRONTEND_URL=https://japan47.alekspetk.com
+   BACKEND_URL=https://japan47.alekspetk.com
+   ```
+
+`localhost` remains only the safe development fallback. Production settings
+require HTTPS for both values and fail during startup if either resolves to an
+HTTP development default.
 
 The verification/reset service calls Resend only from Django. Provider errors are logged without keys or complete tokens and public recovery responses remain generic. Registration leaves a safe pending account if delivery is temporarily unavailable, so the resend page can retry later.
 
@@ -294,6 +329,8 @@ Validation failures use one stable envelope:
 | `/api/v1/reports/` | Authenticated moderation reports |
 | `GET/POST /api/v1/support/` | Authenticated form metadata and multipart support-ticket submission |
 | `/api/v1/auth/...` | Register, login, refresh, logout |
+| `POST /api/v1/auth/account/verify-password/` | Verify the current password before the final deletion warning |
+| `POST /api/v1/auth/account/delete/` | Permanently delete the authenticated account after password and `DELETE` confirmation |
 | `POST /api/v1/auth/verify-email/` | Consume a signed, expiring verification token |
 | `POST /api/v1/auth/resend-verification/` | Generic, throttled verification resend request |
 | `POST /api/v1/auth/password-reset/request/` | Generic, throttled password-reset request |

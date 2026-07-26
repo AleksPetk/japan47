@@ -96,11 +96,11 @@ class PrefectureAdmin(admin.ModelAdmin):
 
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
-    list_display = ("image_thumbnail", "name", "prefecture", "author", "status_display", "pending_changes", "reviewed_by", "reviewed_at", "updated_at")
-    list_filter = ("status", "prefecture__region", "prefecture", "reviewed_at")
+    list_display = ("image_thumbnail", "name", "prefecture", "author", "is_platform_managed", "status_display", "pending_changes", "reviewed_by", "reviewed_at", "updated_at")
+    list_filter = ("status", "is_platform_managed", "prefecture__region", "prefecture", "reviewed_at")
     search_fields = ("name", "city", "author__username", "prefecture__name")
     prepopulated_fields = {"slug": ("name",)}
-    readonly_fields = ("image_large_preview", "reviewed_by", "reviewed_at", "created_at", "updated_at")
+    readonly_fields = ("image_large_preview", "is_platform_managed", "reviewed_by", "reviewed_at", "created_at", "updated_at")
     ordering = ("-created_at",)
     actions = ("approve_places", "reject_places")
     list_select_related = ("author", "prefecture", "reviewed_by")
@@ -342,16 +342,20 @@ class Japan47UserAdmin(UserAdmin):
 
 @admin.register(ContentReport)
 class ContentReportAdmin(admin.ModelAdmin):
-    list_display = ("id", "target_type", "target_link", "reporter", "status_display", "resolved_by", "resolved_at", "created_at")
+    list_display = ("id", "target_type", "target_link", "reporter_display", "status_display", "resolved_by", "resolved_at", "created_at")
     list_filter = ("status", ReportTargetFilter, "created_at")
     list_select_related = ("reporter", "place", "review", "resolved_by")
-    readonly_fields = ("reporter", "place", "review", "target_link", "reason", "created_at", "resolved_at", "resolved_by")
+    readonly_fields = ("reporter_display", "place", "review", "target_link", "reason", "created_at", "resolved_at", "resolved_by")
     search_fields = ("reporter__username", "place__name", "review__comment", "reason")
     actions = ("resolve_reports", "dismiss_reports")
 
     @admin.display(description="Type")
     def target_type(self, obj):
         return "Review" if obj.review_id else "Place"
+
+    @admin.display(description="Reporter", ordering="reporter__username")
+    def reporter_display(self, obj):
+        return obj.reporter or "Deleted user"
 
     @admin.display(description="Reported object")
     def target_link(self, obj):
@@ -425,7 +429,7 @@ class SupportTicketAdmin(admin.ModelAdmin):
     """Keep customer input immutable while staff manage the ticket lifecycle."""
 
     list_display = (
-        "ticket_id", "status_display", "category", "user", "registered_email",
+        "ticket_id", "status_display", "category", "user_display", "registered_email",
         "contact_email_link", "subject", "ticket_age", "created_at", "updated_at",
     )
     list_filter = ("status", "category", "created_at", "updated_at")
@@ -437,19 +441,23 @@ class SupportTicketAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
     readonly_fields = (
-        "ticket_id", "user", "registered_email", "contact_email",
+        "ticket_id", "user_display", "registered_email", "contact_email",
         "contact_email_link", "category", "subject", "related_url",
         "screenshot", "screenshot_preview", "message", "created_at", "updated_at",
     )
     fieldsets = (
         ("Request", {"fields": (
-            "ticket_id", "user", "registered_email", "contact_email_link",
+            "ticket_id", "user_display", "registered_email", "contact_email_link",
             "category", "subject", "related_url", "screenshot", "screenshot_preview", "message",
         )}),
         ("Admin workflow", {"fields": ("status", "assigned_administrator", "internal_notes")}),
         ("Audit", {"fields": ("created_at", "updated_at")}),
     )
     actions = ("mark_in_progress", "mark_resolved", "mark_closed")
+
+    @admin.display(description="User", ordering="user__username")
+    def user_display(self, obj):
+        return obj.user or "Deleted user"
 
     @admin.display(description="Contact email", ordering="contact_email")
     def contact_email_link(self, obj):

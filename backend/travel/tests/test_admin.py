@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
+from django.templatetags.static import static
 from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import totp
@@ -72,6 +73,12 @@ class AdminFixture(TestCase):
 
 
 class PrivateAdminAndTwoFactorTests(AdminFixture):
+    def test_admin_and_two_factor_pages_use_japan47_favicon(self):
+        favicon_url = static("travel/japan47-favicon.png")
+        self.assertContains(self.client.get(reverse("admin:login")), favicon_url)
+        self.client.force_login(self.staff)
+        self.assertContains(self.client.get(reverse("admin-2fa-setup")), favicon_url)
+
     def test_private_route_reverse_and_permissions(self):
         self.assertEqual(reverse("admin:index"), f"/{settings.ADMIN_PATH}")
         self.assertEqual(self.client.get("/admin/").status_code, 404)
