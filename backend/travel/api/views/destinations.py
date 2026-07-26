@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db import IntegrityError, transaction
 from django.db.models import BooleanField, Count, Exists, OuterRef, Prefetch, Q, Value
 from django.http import JsonResponse
 from django.utils import timezone
@@ -7,13 +8,15 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from travel.models import Favorite, Place, PlaceImage, PlaceRevision, Review, ReviewVote, VisitedPlace
+from travel.models import Favorite, Place, PlaceDeletionRequest, PlaceImage, PlaceRevision, Review, ReviewVote, VisitedPlace
 from travel.services import annotate_places_with_ratings
 
 from ..filters import PlaceFilter
 from ..permissions import IsOwnerOrStaff
 from ..serializers import (
     PlaceDetailSerializer,
+    PlaceDeletionRequestCreateSerializer,
+    PlaceDeletionRequestSerializer,
     PlaceListSerializer,
     PlaceWriteSerializer,
     PlaceImageSerializer,
@@ -35,7 +38,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
     ordering = ("-created_at", "-pk")
 
     def get_permissions(self):
-        if self.action in {"create", "update", "partial_update", "destroy"}:
+        if self.action in {"create", "update", "partial_update", "destroy", "deletion_request"}:
             classes = [IsAuthenticated, IsOwnerOrStaff]
         else:
             classes = [AllowAny]
@@ -86,6 +89,11 @@ class PlaceViewSet(viewsets.ModelViewSet):
                         "prefecture", "prefecture__region"
                     ).prefetch_related("gallery_images"),
                     to_attr="moderation_revisions",
+                ),
+                Prefetch(
+                    "deletion_requests",
+                    queryset=PlaceDeletionRequest.objects.order_by("-created_at", "-pk"),
+                    to_attr="moderation_deletion_requests",
                 ),
             )
         user = self.request.user
@@ -151,6 +159,90 @@ class PlaceViewSet(viewsets.ModelViewSet):
         data["nearby_places"] = PlaceListSerializer(nearby, many=True, context={"request": request}).data
         data["rating_distribution"] = distribution
         return JsonResponse(data)
+
+    def destroy(self, request, *args, **kwargs):
+        """Owners must use the moderated deletion workflow; staff retain API control."""
+
+        place = self.get_object()
+        if not request.user.is_staff:
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "deletion_request_required",
+                        "message": "Submit a deletion request with a reason for administrator review.",
+                    }
+                },
+                status=405,
+            )
+        place.delete()
+        response = JsonResponse({}, status=204)
+        response.content = b""
+        return response
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAuthenticated],
+        url_path="deletion-request",
+    )
+    def deletion_request(self, request, pk=None):
+        """Queue an owner's reason without changing or hiding the live place."""
+
+        place = self.get_object()
+        if request.user.is_staff:
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "staff_action_required",
+                        "message": "Administrators should manage places through the administration panel.",
+                    }
+                },
+                status=400,
+            )
+
+        serializer = PlaceDeletionRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                place = Place.objects.select_for_update().get(pk=place.pk)
+                if PlaceDeletionRequest.objects.filter(
+                    place=place,
+                    status=PlaceDeletionRequest.Status.PENDING,
+                ).exists():
+                    return JsonResponse(
+                        {
+                            "error": {
+                                "code": "deletion_request_pending",
+                                "message": "A deletion request for this place is already awaiting review.",
+                            }
+                        },
+                        status=409,
+                    )
+                deletion_request = PlaceDeletionRequest.objects.create(
+                    place=place,
+                    requested_by=request.user,
+                    place_name=place.name,
+                    reason=serializer.validated_data["reason"],
+                )
+        except IntegrityError:
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "deletion_request_pending",
+                        "message": "A deletion request for this place is already awaiting review.",
+                    }
+                },
+                status=409,
+            )
+
+        data = PlaceDeletionRequestSerializer(deletion_request).data
+        return JsonResponse(
+            {
+                "message": "Your deletion request was sent to an administrator for review.",
+                "deletion_request": data,
+            },
+            status=201,
+        )
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def images(self, request, pk=None):

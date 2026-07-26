@@ -10,7 +10,7 @@ from django_otp.oath import totp
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
-from travel.models import ContentReport, Place, PlaceRevision, Prefecture, Region, Review, SupportTicket
+from travel.models import ContentReport, Place, PlaceDeletionRequest, PlaceRevision, Prefecture, Region, Review, SupportTicket
 from config.settings.base import normalized_admin_path
 
 User = get_user_model()
@@ -78,6 +78,12 @@ class PrivateAdminAndTwoFactorTests(AdminFixture):
         self.assertContains(self.client.get(reverse("admin:login")), favicon_url)
         self.client.force_login(self.staff)
         self.assertContains(self.client.get(reverse("admin-2fa-setup")), favicon_url)
+
+        self.verified_admin_session()
+        admin_page = self.client.get(reverse("admin:index"))
+        self.assertNotContains(admin_page, "theme-toggle")
+        self.assertNotContains(admin_page, "admin/css/dark_mode.css")
+        self.assertNotContains(admin_page, "admin/js/theme.js")
 
     def test_private_route_reverse_and_permissions(self):
         self.assertEqual(reverse("admin:index"), f"/{settings.ADMIN_PATH}")
@@ -314,6 +320,58 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertContains(response, reverse("admin:travel_placerevision_changelist"))
         self.assertContains(response, "j47-needs-attention")
         self.assertEqual(revision.status, PlaceRevision.Status.PENDING)
+
+    def test_pending_place_deletion_has_alert_and_record_level_decision_controls(self):
+        deletion_request = PlaceDeletionRequest.objects.create(
+            place=self.place,
+            requested_by=self.author,
+            place_name=self.place.name,
+            reason="The submitted place information is no longer valid.",
+        )
+        dashboard = self.client.get(reverse("admin:index"))
+        self.assertContains(dashboard, "Place Deletion Requests")
+        self.assertContains(dashboard, reverse("admin:travel_placedeletionrequest_changelist"))
+        self.assertContains(dashboard, "j47-needs-attention")
+
+        url = reverse("admin:travel_placedeletionrequest_change", args=(deletion_request.pk,))
+        detail = self.client.get(url)
+        self.assertContains(detail, "Approve Deletion")
+        self.assertContains(detail, "Reject Request")
+        self.assertContains(detail, deletion_request.reason)
+
+        rejected = self.client.post(url, {
+            "admin_note": "The place remains useful to the community.",
+            "_reject_deletion": "1",
+        })
+        self.assertRedirects(rejected, url, fetch_redirect_response=False)
+        deletion_request.refresh_from_db()
+        self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.REJECTED)
+        self.assertEqual(deletion_request.reviewed_by, self.staff)
+        self.assertTrue(Place.objects.filter(pk=self.place.pk).exists())
+        self.assertNotContains(self.client.get(url), "Approve Deletion")
+
+    def test_record_level_approval_permanently_deletes_place(self):
+        deletion_request = PlaceDeletionRequest.objects.create(
+            place=self.place,
+            requested_by=self.author,
+            place_name=self.place.name,
+            reason="This duplicate submission should be removed permanently.",
+        )
+        place_id = self.place.pk
+        url = reverse("admin:travel_placedeletionrequest_change", args=(deletion_request.pk,))
+        response = self.client.post(url, {
+            "admin_note": "Confirmed duplicate.",
+            "_approve_deletion": "1",
+        })
+        self.assertRedirects(response, url, fetch_redirect_response=False)
+        self.assertFalse(Place.objects.filter(pk=place_id).exists())
+        deletion_request.refresh_from_db()
+        self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.APPROVED)
+        self.assertIsNone(deletion_request.place)
+        self.assertEqual(deletion_request.reviewed_by, self.staff)
+        completed = self.client.get(url)
+        self.assertContains(completed, "cannot be moderated again")
+        self.assertNotContains(completed, "Approve Deletion")
 
     def test_report_resolve_and_dismiss_actions_record_audit_identity(self):
         report = ContentReport.objects.create(reporter=self.author, place=self.place, reason="Review")

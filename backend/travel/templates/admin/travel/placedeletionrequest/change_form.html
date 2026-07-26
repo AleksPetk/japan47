@@ -1,0 +1,18 @@
+{% extends "admin/change_form.html" %}
+
+{% block submit_buttons_bottom %}
+  {% if original and original.status == "pending" %}
+    <div class="submit-row j47-moderation-actions">
+      <input type="submit" value="Approve Deletion" name="_approve_deletion" class="default j47-reject-button">
+      <input type="submit" value="Reject Request" name="_reject_deletion" class="j47-approve-button">
+      <input type="submit" value="Save Admin Note" name="_continue" class="j47-save-note-button">
+    </div>
+    <p class="help">Approving permanently deletes the place and all related place data. Rejecting keeps the place unchanged.</p>
+  {% elif original %}
+    <div class="j47-moderation-complete">
+      This deletion request is {{ original.get_status_display|lower }} and cannot be moderated again.
+    </div>
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+{% endblock %}

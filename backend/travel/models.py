@@ -511,6 +511,69 @@ class PlaceImage(models.Model):
         return f"Image for {self.place}"
 
 
+class PlaceDeletionRequest(models.Model):
+    """An owner request that keeps a place live until an administrator decides."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending Review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    place = models.ForeignKey(
+        Place,
+        on_delete=models.SET_NULL,
+        related_name="deletion_requests",
+        blank=True,
+        null=True,
+    )
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="place_deletion_requests",
+        blank=True,
+        null=True,
+    )
+    # Keep a non-sensitive label after approval removes the Place row.
+    place_name = models.CharField(max_length=120, editable=False)
+    reason = models.CharField(max_length=1000)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    admin_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_place_deletion_requests",
+        blank=True,
+        null=True,
+        editable=False,
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+        indexes = [
+            models.Index(
+                fields=("status", "-created_at"),
+                name="deletion_status_created_idx",
+            )
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("place",),
+                condition=models.Q(status="pending"),
+                name="unique_pending_deletion_per_place",
+            )
+        ]
+
+    def __str__(self):
+        return f"Deletion request for {self.place_name}"
+
+
 class Review(models.Model):
     place = models.ForeignKey(
         Place,

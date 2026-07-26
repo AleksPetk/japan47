@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
-from travel.models import Place, PlaceImage, Profile, Review, SupportTicket
+from travel.models import Place, PlaceImage, PlaceRevision, PlaceRevisionImage, Profile, Review, SupportTicket
 
 
 @receiver(pre_save, sender=User)
@@ -52,6 +52,23 @@ def delete_profile_image(sender, instance, **kwargs):
 @receiver(post_delete, sender=PlaceImage)
 def delete_gallery_files(sender, instance, **kwargs):
     """Cascade deletion bypasses model.delete(), so clean both media files here."""
+
+    for image in (instance.image, instance.thumbnail):
+        if image and image.storage.exists(image.name):
+            image.storage.delete(image.name)
+
+
+@receiver(post_delete, sender=PlaceRevision)
+def delete_place_revision_cover(sender, instance, **kwargs):
+    """Remove a proposed cover when its place is permanently deleted."""
+
+    if instance.image and instance.image.storage.exists(instance.image.name):
+        instance.image.storage.delete(instance.image.name)
+
+
+@receiver(post_delete, sender=PlaceRevisionImage)
+def delete_place_revision_gallery_files(sender, instance, **kwargs):
+    """Remove proposed gallery files when a revision is cascade-deleted."""
 
     for image in (instance.image, instance.thumbnail):
         if image and image.storage.exists(image.name):

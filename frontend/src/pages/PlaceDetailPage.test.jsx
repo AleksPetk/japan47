@@ -26,11 +26,12 @@ vi.mock('../hooks/useApi', () => ({
       review_count: 0,
       rating_distribution: {},
       prefecture: { id: 2, name: 'Aomori', region: { label: 'Tohoku' } },
-      author: { id: 8, display_name: 'Hana' },
-      can_edit: false,
+      author: { id: 7, display_name: 'Hana' },
+      can_edit: true,
       is_favorite: false,
       is_visited: true,
       latest_revision: { status: 'pending', review_note: '' },
+      deletion_request: null,
       gallery_images: [],
       reviews: [],
       related_places: [],
@@ -59,5 +60,23 @@ describe('PlaceDetailPage viewer state', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Mark visited' }))
     expect(apiMock).toHaveBeenLastCalledWith('/places/12/visited/', { method: 'POST' })
     expect(screen.getByRole('button', { name: 'Visited ✓' })).toBeInTheDocument()
+  })
+
+  it('submits an owner deletion reason for admin review instead of deleting directly', async () => {
+    apiMock.mockResolvedValueOnce({
+      deletion_request: { id: 4, status: 'pending', reason: 'This listing is no longer valid.', admin_note: '' },
+    })
+    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Request deletion' }))
+    await userEvent.type(screen.getByLabelText('Why should this place be deleted?'), 'This listing is no longer valid.')
+    await userEvent.click(screen.getByRole('button', { name: 'Send deletion request' }))
+
+    expect(apiMock).toHaveBeenCalledWith('/places/12/deletion-request/', {
+      method: 'POST',
+      body: JSON.stringify({ reason: 'This listing is no longer valid.' }),
+    })
+    expect(await screen.findByText(/awaiting administrator review/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deletion requested' })).toBeDisabled()
   })
 })

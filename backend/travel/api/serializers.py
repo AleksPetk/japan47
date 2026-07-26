@@ -13,6 +13,7 @@ from travel.models import (
     Itinerary,
     ItineraryStop,
     Place,
+    PlaceDeletionRequest,
     PlaceImage,
     PlaceRevision,
     PlaceRevisionImage,
@@ -158,6 +159,24 @@ class PlaceRevisionSerializer(serializers.ModelSerializer):
         )
 
 
+class PlaceDeletionRequestCreateSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        allow_blank=False,
+        max_length=1000,
+        min_length=10,
+        trim_whitespace=True,
+    )
+
+
+class PlaceDeletionRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlaceDeletionRequest
+        fields = (
+            "id", "status", "reason", "admin_note", "created_at", "reviewed_at",
+        )
+        read_only_fields = fields
+
+
 class PlaceListSerializer(serializers.ModelSerializer):
     image_url = AbsoluteImageField(source="image", read_only=True)
     prefecture = PrefectureSummarySerializer(read_only=True)
@@ -202,9 +221,10 @@ class PlaceDetailSerializer(PlaceListSerializer):
     reviews = ReviewSerializer(many=True, read_only=True)
     gallery_images = PlaceImageSerializer(many=True, read_only=True)
     latest_revision = serializers.SerializerMethodField()
+    deletion_request = serializers.SerializerMethodField()
 
     class Meta(PlaceListSerializer.Meta):
-        fields = PlaceListSerializer.Meta.fields + ("google_maps_url", "official_website", "travel_tips", "latitude", "longitude", "gallery_images", "reviews", "latest_revision")
+        fields = PlaceListSerializer.Meta.fields + ("google_maps_url", "official_website", "travel_tips", "latitude", "longitude", "gallery_images", "reviews", "latest_revision", "deletion_request")
 
     def get_latest_revision(self, obj):
         request = self.context["request"]
@@ -215,6 +235,18 @@ class PlaceDetailSerializer(PlaceListSerializer):
         revisions = getattr(obj, "moderation_revisions", None)
         revision = revisions[0] if revisions else None
         return PlaceRevisionSerializer(revision, context=self.context).data if revision else None
+
+    def get_deletion_request(self, obj):
+        request = self.context["request"]
+        if not request.user.is_authenticated or not (
+            request.user.is_staff or obj.author_id == request.user.id
+        ):
+            return None
+        requests = getattr(obj, "moderation_deletion_requests", None)
+        deletion_request = requests[0] if requests else None
+        if deletion_request is None:
+            return None
+        return PlaceDeletionRequestSerializer(deletion_request).data
 
 
 class PlaceWriteSerializer(serializers.ModelSerializer):

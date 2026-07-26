@@ -176,6 +176,7 @@ input:focus,select:focus,textarea:focus { border-color:var(--red); outline:2px s
 .status { margin-bottom:1.5rem;padding:.8rem 1rem;background:#fff3cf;border-left:4px solid var(--gold);text-transform:capitalize; }
 .status--rejected { background:#f9d9d6;border-color:var(--red); }
 .owner-actions { display:flex;gap:.8rem; }
+.place-deletion-form { display:grid;gap:.8rem; }.place-deletion-form>p { margin:0 0 .35rem;color:var(--muted);line-height:1.6; }.place-deletion-form label { font-weight:700; }.place-deletion-form textarea { width:100%;resize:vertical; }.place-deletion-form small { color:var(--muted);font-size:.78rem; }
 .detail-columns { display:grid;grid-template-columns:2fr 1fr;gap:4rem; }
 .prose aside { margin-top:2rem;padding:1.3rem;border-left:4px solid var(--red);background:#f2efe5; }
 .facts { padding:1.5rem;background:var(--white);border:1px solid var(--line);align-self:start; }

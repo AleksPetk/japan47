@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 
-from travel.models import ContentReport, Place, PlaceRevision, Prefecture, Region, Review, SupportTicket
+from travel.models import ContentReport, Place, PlaceDeletionRequest, PlaceRevision, Prefecture, Region, Review, SupportTicket
 
 register = template.Library()
 
@@ -48,6 +48,7 @@ def admin_metrics(request):
     )
     reviews = Review.objects.aggregate(total=Count("id"), average=Avg("rating"))
     pending_revisions = PlaceRevision.objects.filter(status=PlaceRevision.Status.PENDING).count()
+    pending_deletions = PlaceDeletionRequest.objects.filter(status=PlaceDeletionRequest.Status.PENDING).count()
 
     metrics = {
         **places,
@@ -65,6 +66,7 @@ def admin_metrics(request):
         "total_reviews": reviews["total"],
         "average_rating": round(reviews["average"] or 0, 2),
         "pending_revisions": pending_revisions,
+        "pending_deletions": pending_deletions,
         "total_prefectures": Prefecture.objects.count(),
         "total_regions": Region.objects.count(),
     }
@@ -84,6 +86,7 @@ def japan47_admin_sidebar(context):
     definitions = {
         "Place": (counts["pending"], "status__exact=pending"),
         "PlaceRevision": (counts["pending_revisions"], "status__exact=pending"),
+        "PlaceDeletionRequest": (counts["pending_deletions"], "status__exact=pending"),
         "SupportTicket": (counts["new_support"], "status__exact=new"),
         "ContentReport": (counts["open_reports"], "status__exact=open"),
     }

@@ -186,7 +186,7 @@ describe('Japan 47 routes', () => {
     expect(enabledFinalButton).toBeEnabled()
     await userEvent.click(enabledFinalButton)
     expect(await screen.findByRole('heading', { name: /Discover Japan/ })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Your account has been permanently deleted.')
+    expect(screen.getByText('Your account has been permanently deleted.')).toBeInTheDocument()
     expect(tokenStore.get()).toBeNull()
     const deleteCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/account/delete/'))
     expect(JSON.parse(deleteCall[1].body)).toEqual({ password: 'StrongPass123!', confirmation: 'DELETE' })

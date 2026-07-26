@@ -4,6 +4,7 @@
   <div class="j47-metric-grid j47-metric-grid--attention">
     <a class="j47-metric{% if metrics.pending %} is-actionable{% endif %}" href="{% url 'admin:travel_place_changelist' %}?status__exact=pending"><span>Pending Places</span><strong>{{ metrics.pending }}</strong></a>
     <a class="j47-metric{% if metrics.pending_revisions %} is-actionable{% endif %}" href="{% url 'admin:travel_placerevision_changelist' %}?status__exact=pending"><span>Pending Place Edits</span><strong>{{ metrics.pending_revisions }}</strong></a>
+    <a class="j47-metric{% if metrics.pending_deletions %} is-actionable{% endif %}" href="{% url 'admin:travel_placedeletionrequest_changelist' %}?status__exact=pending"><span>Place Deletion Requests</span><strong>{{ metrics.pending_deletions }}</strong></a>
     <a class="j47-metric{% if metrics.new_support %} is-actionable{% endif %}" href="{% url 'admin:travel_supportticket_changelist' %}?status__exact=new"><span>New Support Tickets</span><strong>{{ metrics.new_support }}</strong></a>
     <a class="j47-metric{% if metrics.open_reports %} is-actionable{% endif %}" href="{% url 'admin:travel_contentreport_changelist' %}?status__exact=open"><span>Open Content Reports</span><strong>{{ metrics.open_reports }}</strong></a>
     <a class="j47-metric{% if metrics.reported_reviews %} is-actionable{% endif %}" href="{% url 'admin:travel_contentreport_changelist' %}?status__exact=open&target=review"><span>Reported Reviews</span><strong>{{ metrics.reported_reviews }}</strong></a>

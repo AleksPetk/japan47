@@ -14,6 +14,7 @@ from .models import (
     Follow,
     Itinerary,
     Place,
+    PlaceDeletionRequest,
     PlaceImage,
     PlaceRevision,
     PlaceRevisionImage,
@@ -26,6 +27,7 @@ from .models import (
     VisitedPlace,
 )
 from .place_revisions import approve_place_revision, reject_place_revision
+from .place_deletions import approve_place_deletion, reject_place_deletion
 
 
 def image_preview(image, *, large=False):
@@ -275,6 +277,94 @@ class PlaceRevisionAdmin(admin.ModelAdmin):
             else:
                 reject_place_revision(obj, request.user)
                 self.message_user(request, "The proposed place changes were rejected.", messages.WARNING)
+            return HttpResponseRedirect(change_url)
+
+        return super().response_change(request, obj)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PlaceDeletionRequest)
+class PlaceDeletionRequestAdmin(admin.ModelAdmin):
+    """Review owner requests without allowing the workflow state to be forged."""
+
+    list_display = (
+        "place_name", "requested_by", "status_display", "created_at",
+        "reviewed_by", "reviewed_at",
+    )
+    list_filter = ("status", "created_at", "reviewed_at")
+    search_fields = ("place_name", "requested_by__username", "reason")
+    list_select_related = ("place", "requested_by", "reviewed_by")
+    ordering = ("-created_at",)
+    actions = ("approve_deletions", "reject_deletions")
+    change_form_template = "admin/travel/placedeletionrequest/change_form.html"
+    readonly_fields = (
+        "place_link", "place_name", "requested_by", "reason", "status",
+        "reviewed_by", "reviewed_at", "created_at", "updated_at",
+    )
+    fieldsets = (
+        ("Deletion request", {"fields": ("place_link", "place_name", "requested_by", "reason", "status")}),
+        ("Administrator decision", {"fields": ("admin_note",)}),
+        ("Audit", {"fields": ("reviewed_by", "reviewed_at", "created_at", "updated_at")}),
+    )
+
+    @admin.display(description="Status", ordering="status")
+    def status_display(self, obj):
+        return status_badge(obj)
+
+    @admin.display(description="Current place")
+    def place_link(self, obj):
+        if obj.place_id is None:
+            return "Deleted after approval"
+        url = reverse("admin:travel_place_change", args=(obj.place_id,))
+        return format_html('<a href="{}">{}</a>', url, obj.place)
+
+    @admin.action(description="Approve selected deletion requests")
+    def approve_deletions(self, request, queryset):
+        count = 0
+        for deletion_request in queryset.filter(status=PlaceDeletionRequest.Status.PENDING):
+            approve_place_deletion(deletion_request, request.user)
+            count += 1
+        self.message_user(
+            request,
+            f"Approved {count} deletion request(s); their places were permanently deleted.",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Reject selected deletion requests")
+    def reject_deletions(self, request, queryset):
+        count = 0
+        for deletion_request in queryset.filter(status=PlaceDeletionRequest.Status.PENDING):
+            reject_place_deletion(deletion_request, request.user)
+            count += 1
+        self.message_user(request, f"Rejected {count} deletion request(s).", messages.WARNING)
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = super().get_readonly_fields(request, obj)
+        if obj and obj.status != PlaceDeletionRequest.Status.PENDING:
+            return (*fields, "admin_note")
+        return fields
+
+    def response_change(self, request, obj):
+        change_url = reverse("admin:travel_placedeletionrequest_change", args=(obj.pk,))
+        if "_approve_deletion" in request.POST:
+            if obj.status != PlaceDeletionRequest.Status.PENDING:
+                self.message_user(request, "This deletion request has already been reviewed.", messages.WARNING)
+            else:
+                approve_place_deletion(obj, request.user)
+                self.message_user(request, "The deletion was approved and the place was permanently deleted.", messages.SUCCESS)
+            return HttpResponseRedirect(change_url)
+
+        if "_reject_deletion" in request.POST:
+            if obj.status != PlaceDeletionRequest.Status.PENDING:
+                self.message_user(request, "This deletion request has already been reviewed.", messages.WARNING)
+            else:
+                reject_place_deletion(obj, request.user)
+                self.message_user(request, "The deletion request was rejected; the place remains available.", messages.WARNING)
             return HttpResponseRedirect(change_url)
 
         return super().response_change(request, obj)

@@ -17,7 +17,8 @@ from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from travel.models import Collection, ContentReport, Favorite, Follow, Place, PlaceImage, PlaceRevision, PlaceRevisionImage, Prefecture, Region, Review, ReviewVote, SupportTicket, VisitedPlace
+from travel.models import Collection, ContentReport, Favorite, Follow, Place, PlaceDeletionRequest, PlaceImage, PlaceRevision, PlaceRevisionImage, Prefecture, Region, Review, ReviewVote, SupportTicket, VisitedPlace
+from travel.place_deletions import approve_place_deletion, reject_place_deletion
 from travel.place_revisions import approve_place_revision
 from travel.services import bayesian_rating, get_badge_progress, get_contributor_stats
 from travel.accounts.tokens import make_email_verification_token
@@ -432,6 +433,114 @@ class PlaceMutationApiTests(ApiFixture):
         revision = PlaceRevision.objects.get(place=self.published)
         self.assertEqual(revision.name, "Staff corrected name")
         self.assertEqual(revision.submitted_by, self.staff)
+
+    def test_owner_must_request_deletion_with_a_reason(self):
+        url = f"/api/v1/places/{self.published.pk}/"
+        request_url = f"{url}deletion-request/"
+
+        self.assertEqual(self.client.post(request_url, {"reason": "A valid reason for removal."}).status_code, 401)
+        self.authenticate(self.author)
+        direct = self.client.delete(url)
+        self.assertEqual(direct.status_code, 405)
+        self.assertEqual(direct.json()["error"]["code"], "deletion_request_required")
+        self.assertTrue(Place.objects.filter(pk=self.published.pk).exists())
+
+        invalid = self.client.post(request_url, {"reason": "short"})
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn("reason", invalid.json()["error"]["fields"])
+
+        created = self.client.post(request_url, {"reason": "This listing is no longer valid."})
+        self.assertEqual(created.status_code, 201)
+        deletion_request = PlaceDeletionRequest.objects.get(place=self.published)
+        self.assertEqual(deletion_request.requested_by, self.author)
+        self.assertEqual(deletion_request.place_name, "Akihabara")
+        self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.PENDING)
+        self.assertTrue(Place.objects.filter(pk=self.published.pk).exists())
+
+        duplicate = self.client.post(request_url, {"reason": "A second valid deletion reason."})
+        self.assertEqual(duplicate.status_code, 409)
+        self.assertEqual(PlaceDeletionRequest.objects.filter(place=self.published).count(), 1)
+
+    def test_only_owner_can_request_deletion_and_status_is_private(self):
+        request_url = f"/api/v1/places/{self.published.pk}/deletion-request/"
+        self.authenticate(self.other)
+        self.assertEqual(
+            self.client.post(request_url, {"reason": "I should not be allowed to remove this."}).status_code,
+            403,
+        )
+
+        self.authenticate(self.author)
+        self.client.post(request_url, {"reason": "This listing is no longer valid."})
+        owner_detail = self.client.get(f"/api/v1/places/{self.published.pk}/").json()
+        self.assertEqual(owner_detail["deletion_request"]["status"], PlaceDeletionRequest.Status.PENDING)
+        self.client.force_authenticate()
+        public_detail = self.client.get(f"/api/v1/places/{self.published.pk}/").json()
+        self.assertIsNone(public_detail["deletion_request"])
+
+    def test_rejected_deletion_keeps_place_and_allows_a_new_request(self):
+        deletion_request = PlaceDeletionRequest.objects.create(
+            place=self.published,
+            requested_by=self.author,
+            place_name=self.published.name,
+            reason="This listing is no longer valid.",
+        )
+        reject_place_deletion(deletion_request, self.staff)
+        deletion_request.refresh_from_db()
+        self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.REJECTED)
+        self.assertEqual(deletion_request.reviewed_by, self.staff)
+        self.assertTrue(Place.objects.filter(pk=self.published.pk).exists())
+
+        self.authenticate(self.author)
+        response = self.client.post(
+            f"/api/v1/places/{self.published.pk}/deletion-request/",
+            {"reason": "There is now another valid reason for removal."},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            PlaceDeletionRequest.objects.filter(
+                place=self.published,
+                status=PlaceDeletionRequest.Status.PENDING,
+            ).count(),
+            1,
+        )
+
+    def test_approved_deletion_cascades_place_data_and_preserves_audit_result(self):
+        review = Review.objects.create(place=self.published, author=self.other, rating=4)
+        favorite = Favorite.objects.create(place=self.published, user=self.other)
+        visited = VisitedPlace.objects.create(place=self.published, user=self.other)
+        report = ContentReport.objects.create(place=self.published, reporter=self.other, reason="Review this place.")
+        gallery_image = PlaceImage.objects.bulk_create([
+            PlaceImage(place=self.published, image="place_gallery/deletion-test.jpg")
+        ])[0]
+        revision = PlaceRevision.objects.create(
+            place=self.published,
+            submitted_by=self.author,
+            prefecture=self.prefecture,
+            name=self.published.name,
+            description=self.published.description,
+        )
+        deletion_request = PlaceDeletionRequest.objects.create(
+            place=self.published,
+            requested_by=self.author,
+            place_name=self.published.name,
+            reason="This listing should be permanently removed.",
+        )
+        place_id = self.published.pk
+
+        approve_place_deletion(deletion_request, self.staff)
+
+        self.assertFalse(Place.objects.filter(pk=place_id).exists())
+        self.assertFalse(Review.objects.filter(pk=review.pk).exists())
+        self.assertFalse(Favorite.objects.filter(pk=favorite.pk).exists())
+        self.assertFalse(VisitedPlace.objects.filter(pk=visited.pk).exists())
+        self.assertFalse(ContentReport.objects.filter(pk=report.pk).exists())
+        self.assertFalse(PlaceImage.objects.filter(pk=gallery_image.pk).exists())
+        self.assertFalse(PlaceRevision.objects.filter(pk=revision.pk).exists())
+        deletion_request.refresh_from_db()
+        self.assertIsNone(deletion_request.place)
+        self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.APPROVED)
+        self.assertEqual(deletion_request.reviewed_by, self.staff)
+        self.assertIsNotNone(deletion_request.reviewed_at)
 
     def test_review_validation_uniqueness_and_permissions(self):
         self.authenticate(self.other)
