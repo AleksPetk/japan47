@@ -17,7 +17,7 @@ function seoFiles(publicUrl) {
     closeBundle() {
       const urls = publicRoutes.map((route) => `  <url><loc>${origin}/${route}</loc></url>`).join('\n')
       writeFileSync(resolve('dist/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`)
-      writeFileSync(resolve('dist/robots.txt'), `User-agent: *\nAllow: /\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nSitemap: ${origin}/sitemap.xml\n`)
+      writeFileSync(resolve('dist/robots.txt'), `User-agent: *\n\nAllow: /\n\nDisallow: /j47-management/\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`)
     },
   }
 }
