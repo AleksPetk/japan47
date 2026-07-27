@@ -1,7 +1,12 @@
 User-agent: *
+
 Allow: /
+
+Disallow: /j47-management/
 Disallow: /profile/
 Disallow: /my-travel
 Disallow: /login
 Disallow: /register
+Disallow: /api/
 
+Sitemap: https://japan47.alekspetk.com/sitemap.xml
