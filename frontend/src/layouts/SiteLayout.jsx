@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import SEO from '../components/SEO'
 import { useAuth } from '../context/AuthContext'
-import { getRouteMetadata, SITE_URL } from '../utils/seo'
+import { getRouteMetadata } from '../utils/seo'
 
 export default function SiteLayout() {
   const [open, setOpen] = useState(false)
@@ -10,16 +10,6 @@ export default function SiteLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const routeMetadata = getRouteMetadata(location.pathname)
-  useEffect(() => {
-    let structuredData = document.querySelector('#japan47-structured-data')
-    if (!structuredData) {
-      structuredData = document.createElement('script')
-      structuredData.id = 'japan47-structured-data'
-      structuredData.type = 'application/ld+json'
-      document.head.appendChild(structuredData)
-    }
-    structuredData.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Japan 47', url: SITE_URL, potentialAction: { '@type': 'SearchAction', target: `${SITE_URL}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' } })
-  }, [])
   useEffect(() => {
     // Account deletion navigates to this public route before clearing the
     // context, preventing the old protected route from redirecting to login.

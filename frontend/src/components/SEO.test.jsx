@@ -10,6 +10,7 @@ describe('SEO', () => {
       canonicalPath="/regions/kanto"
       type="article"
       image="/media/kanto.jpg"
+      structuredData={{ '@type': 'TouristAttraction', name: 'Mount Takao' }}
     />)
 
     await waitFor(() => expect(document.title).toBe('Kanto Region Travel Guide | Japan47'))
@@ -26,10 +27,24 @@ describe('SEO', () => {
     expect(document.querySelector('meta[name="twitter:description"]')).toHaveAttribute('content', 'Explore Kanto.')
     expect(document.querySelector('meta[name="twitter:image"]')).toHaveAttribute('content', 'https://japan47.alekspetk.com/media/kanto.jpg')
     expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute('href', 'https://japan47.alekspetk.com/regions/kanto')
+    const structuredData = JSON.parse(document.querySelector('script[data-jsonld="structured-data"]').textContent)
+    expect(structuredData['@context']).toBe('https://schema.org')
+    expect(structuredData['@graph'].map((schema) => schema['@type'])).toEqual([
+      'Organization', 'WebSite', 'BreadcrumbList', 'TouristAttraction',
+    ])
+    expect(structuredData['@graph'][2].itemListElement).toEqual([
+      expect.objectContaining({ position: 1, name: 'Home', item: 'https://japan47.alekspetk.com/' }),
+      expect.objectContaining({ position: 2, name: 'Regions', item: 'https://japan47.alekspetk.com/regions' }),
+      expect.objectContaining({ position: 3, name: 'Kanto Region Travel Guide', item: 'https://japan47.alekspetk.com/regions/kanto' }),
+    ])
 
     view.rerender(<SEO title="Japan47" canonicalPath="/" />)
     await waitFor(() => expect(document.title).toBe('Japan47'))
     expect(document.querySelectorAll('link[rel="canonical"]')).toHaveLength(1)
     expect(document.querySelector('meta[property="og:image"]')).toHaveAttribute('content', 'https://japan47.alekspetk.com/images/japan47-og.jpg')
+    const defaultStructuredData = JSON.parse(document.querySelector('script[data-jsonld="structured-data"]').textContent)
+    expect(defaultStructuredData['@graph'].map((schema) => schema['@type'])).toEqual([
+      'Organization', 'WebSite', 'BreadcrumbList',
+    ])
   })
 })

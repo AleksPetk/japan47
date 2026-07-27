@@ -10,7 +10,7 @@ import SEO from '../components/SEO'
 import { useAuth } from '../context/AuthContext'
 import { useApi } from '../hooks/useApi'
 import { formatDate } from '../utils/format'
-import { imageContentType, summarize } from '../utils/seo'
+import { absolutePublicUrl, imageContentType, summarize } from '../utils/seo'
 
 export default function PlaceDetailPage() {
   const { id } = useParams(); const { user } = useAuth(); const [revision, setRevision] = useState(0); const [lightbox, setLightbox] = useState(null)
@@ -64,7 +64,37 @@ export default function PlaceDetailPage() {
   const gallery = [{ id: 'cover', image_url: data.image_url, caption: data.name }, ...data.gallery_images].filter((image) => image.image_url).slice(0, 5)
   const socialImage = data.image_url || data.gallery_images.find((image) => image.image_url)?.image_url
   const description = summarize(data.description, `Discover ${data.name} in ${data.prefecture.name}, Japan, with traveler ratings, reviews, and practical travel information.`)
-  return <article className="detail page"><SEO title={`${data.name}, ${data.prefecture.name} | Japan47`} description={description} canonicalPath={`/places/${data.id}/${data.slug}`} robots={data.status === 'published' ? 'index, follow' : 'noindex, nofollow'} type="article" image={socialImage} imageType={imageContentType(socialImage)} /><p className="breadcrumbs"><Link to="/places">Places</Link> / <Link to={`/prefectures/${data.prefecture.name}`}>{data.prefecture.name}</Link> / {data.name}</p>
+  const canonicalPath = `/places/${data.id}/${data.slug}`
+  const canonicalUrl = absolutePublicUrl(canonicalPath)
+  const attractionSchema = {
+    '@type': 'TouristAttraction',
+    '@id': `${canonicalUrl}#attraction`,
+    name: data.name,
+    description,
+    url: canonicalUrl,
+    image: absolutePublicUrl(socialImage),
+    mainEntityOfPage: canonicalUrl,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: data.city || undefined,
+      addressRegion: data.prefecture.name,
+      addressCountry: 'JP',
+    },
+    geo: data.latitude != null && data.longitude != null ? {
+      '@type': 'GeoCoordinates',
+      latitude: data.latitude,
+      longitude: data.longitude,
+    } : undefined,
+    aggregateRating: data.average_rating && data.review_count ? {
+      '@type': 'AggregateRating',
+      ratingValue: data.average_rating,
+      reviewCount: data.review_count,
+      bestRating: 5,
+      worstRating: 1,
+    } : undefined,
+    sameAs: data.official_website || undefined,
+  }
+  return <article className="detail page"><SEO title={`${data.name}, ${data.prefecture.name} | Japan47`} description={description} canonicalPath={canonicalPath} robots={data.status === 'published' ? 'index, follow' : 'noindex, nofollow'} type="article" image={socialImage} imageType={imageContentType(socialImage)} structuredData={attractionSchema} /><p className="breadcrumbs"><Link to="/places">Places</Link> / <Link to={`/prefectures/${data.prefecture.name}`}>{data.prefecture.name}</Link> / {data.name}</p>
     {data.status !== 'published' && <div className={`status status--${data.status}`}>{data.status}: only you and staff can see this submission.</div>}
     {data.latest_revision?.status === 'pending' && <div className="status status--pending">Your proposed changes are awaiting review. This page continues to show the approved version.</div>}
     {data.latest_revision?.status === 'rejected' && <div className="status status--rejected">Your latest proposed changes were rejected.{data.latest_revision.review_note ? ` ${data.latest_revision.review_note}` : ''} The approved version was not changed.</div>}

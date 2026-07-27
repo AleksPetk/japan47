@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,6 +49,23 @@ beforeEach(() => {
 })
 
 describe('PlaceDetailPage viewer state', () => {
+  it('publishes TouristAttraction structured data from the place response', async () => {
+    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+
+    await waitFor(() => expect(document.querySelector('script[data-jsonld="structured-data"]')).toBeInTheDocument())
+    const graph = JSON.parse(document.querySelector('script[data-jsonld="structured-data"]').textContent)['@graph']
+    expect(graph.find((schema) => schema['@type'] === 'TouristAttraction')).toMatchObject({
+      name: 'Lake Towada',
+      description: 'A scenic caldera lake.',
+      url: 'https://japan47.alekspetk.com/places/12/lake-towada',
+      address: {
+        '@type': 'PostalAddress',
+        addressRegion: 'Aomori',
+        addressCountry: 'JP',
+      },
+    })
+  })
+
   it('immediately unmarks and remarks a visited place with the correct methods', async () => {
     render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
 
