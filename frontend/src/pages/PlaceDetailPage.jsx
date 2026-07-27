@@ -6,9 +6,11 @@ import { PlaceCard } from '../components/Cards'
 import MediaImage from '../components/MediaImage'
 import Modal from '../components/Modal'
 import Rating from '../components/Rating'
+import SEO from '../components/SEO'
 import { useAuth } from '../context/AuthContext'
 import { useApi } from '../hooks/useApi'
 import { formatDate } from '../utils/format'
+import { imageContentType, summarize } from '../utils/seo'
 
 export default function PlaceDetailPage() {
   const { id } = useParams(); const { user } = useAuth(); const [revision, setRevision] = useState(0); const [lightbox, setLightbox] = useState(null)
@@ -60,7 +62,9 @@ export default function PlaceDetailPage() {
   const reportReview = async (review) => { const reason = window.prompt('Briefly explain what should be reviewed by moderators:'); if (reason?.trim()) { await api('/reports/', { method: 'POST', body: JSON.stringify({ review: review.id, reason: reason.trim() }) }); window.alert('Report submitted to the moderation team.') } }
   const share = async () => { const details = { title: data.name, text: data.description.slice(0, 120), url: window.location.href }; if (navigator.share) await navigator.share(details); else { await navigator.clipboard.writeText(details.url); window.alert('Link copied.') } }
   const gallery = [{ id: 'cover', image_url: data.image_url, caption: data.name }, ...data.gallery_images].filter((image) => image.image_url).slice(0, 5)
-  return <article className="detail page"><p className="breadcrumbs"><Link to="/places">Places</Link> / <Link to={`/prefectures/${data.prefecture.name}`}>{data.prefecture.name}</Link> / {data.name}</p>
+  const socialImage = data.image_url || data.gallery_images.find((image) => image.image_url)?.image_url
+  const description = summarize(data.description, `Discover ${data.name} in ${data.prefecture.name}, Japan, with traveler ratings, reviews, and practical travel information.`)
+  return <article className="detail page"><SEO title={`${data.name}, ${data.prefecture.name} | Japan47`} description={description} canonicalPath={`/places/${data.id}/${data.slug}`} robots={data.status === 'published' ? 'index, follow' : 'noindex, nofollow'} type="article" image={socialImage} imageType={imageContentType(socialImage)} /><p className="breadcrumbs"><Link to="/places">Places</Link> / <Link to={`/prefectures/${data.prefecture.name}`}>{data.prefecture.name}</Link> / {data.name}</p>
     {data.status !== 'published' && <div className={`status status--${data.status}`}>{data.status}: only you and staff can see this submission.</div>}
     {data.latest_revision?.status === 'pending' && <div className="status status--pending">Your proposed changes are awaiting review. This page continues to show the approved version.</div>}
     {data.latest_revision?.status === 'rejected' && <div className="status status--rejected">Your latest proposed changes were rejected.{data.latest_revision.review_note ? ` ${data.latest_revision.review_note}` : ''} The approved version was not changed.</div>}

@@ -3,8 +3,10 @@ import { PlaceCard } from '../components/Cards'
 import { EmptyState, ErrorState, LoadingState } from '../components/AsyncState'
 import MediaImage from '../components/MediaImage'
 import Rating from '../components/Rating'
+import SEO from '../components/SEO'
 import { useAuth } from '../context/AuthContext'
 import { useApi } from '../hooks/useApi'
+import { imageContentType, summarize } from '../utils/seo'
 
 export default function PrefectureDetailPage() {
   const { name } = useParams(); const { user } = useAuth()
@@ -13,7 +15,9 @@ export default function PrefectureDetailPage() {
   const featured = [...data.places].sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0))[0]
   const totalReviews = data.places.reduce((sum, place) => sum + place.review_count, 0)
   const gallery = data.places.filter((place) => place.image_url).slice(0, 4)
-  return <article className="detail page prefecture-detail"><p className="breadcrumbs"><Link to="/regions">Regions</Link> / <Link to={`/regions/${data.region.name}`}>{data.region.label}</Link> / {data.name}</p>
+  const socialImage = data.image_url || featured?.image_url
+  const description = summarize(data.description, `Discover places to visit, traveler recommendations, and local highlights across ${data.name} Prefecture, Japan.`)
+  return <article className="detail page prefecture-detail"><SEO title={`${data.name} Prefecture Travel Guide | Japan47`} description={description} canonicalPath={`/prefectures/${encodeURIComponent(data.name)}`} image={socialImage} imageType={imageContentType(socialImage)} /><p className="breadcrumbs"><Link to="/regions">Regions</Link> / <Link to={`/regions/${data.region.name}`}>{data.region.label}</Link> / {data.name}</p>
     <figure className="prefecture-cover"><MediaImage src={data.image_url} alt={`${data.name} prefecture`} mark="県" priority /><figcaption><span>{data.region.label} region</span><strong>{data.name}, Japan</strong></figcaption></figure>
     <section className="prefecture-stats" aria-label={`${data.name} travel statistics`}><div><span>Destinations</span><strong>{data.published_place_count}</strong><small>published places</small></div><div><span>Community</span><strong>{totalReviews}</strong><small>traveler reviews</small></div><div><span>Rating</span><strong>{data.average_rating ? Number(data.average_rating).toFixed(1) : '—'}</strong><small>out of five</small></div></section>
     <section className="prefecture-overview"><p className="eyebrow">Discover {data.name}</p><h2>Experience the prefecture</h2><p className="prefecture-intro">{data.description || 'Community recommendations for this prefecture are growing.'}</p><div className="prefecture-overview__actions"><Link className="button button--primary" to={`/places?prefecture=${encodeURIComponent(data.name)}`}>Explore places</Link>{user && <Link className="button" to={`/places/new?prefecture=${encodeURIComponent(data.name)}`}>Suggest a place</Link>}</div></section>

@@ -1,22 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import SEO from '../components/SEO'
 import { useAuth } from '../context/AuthContext'
+import { getRouteMetadata, SITE_URL } from '../utils/seo'
 
 export default function SiteLayout() {
   const [open, setOpen] = useState(false)
   const { user, logout, clearAuth } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const routeMetadata = getRouteMetadata(location.pathname)
   useEffect(() => {
-    const section = location.pathname.split('/').filter(Boolean)[0]
-    const labels = { regions: 'Regions', prefectures: 'Prefectures', places: 'Places', search: 'Search', contributors: 'Contributor', 'my-travel': 'My travel', contact: 'Contact', login: 'Login', register: 'Register', 'check-email': 'Check your email', 'verify-email': 'Verify email', 'forgot-password': 'Forgot password', 'reset-password': 'Reset password', privacy: 'Privacy', terms: 'Terms' }
-    document.title = section ? `${labels[section] || 'Japan 47'} — Japan 47` : 'Japan 47 — Discover every prefecture'
-    const canonical = document.querySelector('link[rel="canonical"]')
-    if (canonical) canonical.href = `${window.location.origin}${location.pathname}`
-    const description = document.querySelector('meta[name="description"]')
-    if (description) description.content = section
-      ? `Explore Japan 47 ${labels[section] || section} travel guides and community recommendations.`
-      : 'Discover destinations across all 47 Japanese prefectures with community travel guides and reviews.'
     let structuredData = document.querySelector('#japan47-structured-data')
     if (!structuredData) {
       structuredData = document.createElement('script')
@@ -24,8 +18,8 @@ export default function SiteLayout() {
       structuredData.type = 'application/ld+json'
       document.head.appendChild(structuredData)
     }
-    structuredData.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Japan 47', url: window.location.origin, potentialAction: { '@type': 'SearchAction', target: `${window.location.origin}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' } })
-  }, [location.pathname])
+    structuredData.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Japan 47', url: SITE_URL, potentialAction: { '@type': 'SearchAction', target: `${SITE_URL}/search?q={search_term_string}`, 'query-input': 'required name=search_term_string' } })
+  }, [])
   useEffect(() => {
     // Account deletion navigates to this public route before clearing the
     // context, preventing the old protected route from redirecting to login.
@@ -42,7 +36,7 @@ export default function SiteLayout() {
     }
     navigate('/', { replace: true })
   }
-  return <div className="site-shell">
+  return <><SEO {...routeMetadata} /><div className="site-shell">
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="site-header"><Link className="brand" to="/" onClick={close}><img src="/logo.PNG" alt="Japan 47" /></Link>
       <button className="menu-toggle" aria-expanded={open} aria-controls="main-nav" onClick={() => setOpen(!open)}><span /><span /><span /><b className="sr-only">Menu</b></button>
@@ -55,5 +49,5 @@ export default function SiteLayout() {
     {location.state?.successMessage && <div className="site-notice" role="status">{location.state.successMessage}</div>}
     <main id="main"><Outlet /></main>
     <footer><nav aria-label="Support and legal"><Link to="/contact">Contact Us</Link><Link to="/privacy">Privacy Policy</Link><Link to="/terms">Terms of Use</Link></nav><p>© {new Date().getFullYear()} Japan 47. All rights reserved.</p><small>Created by Aleks Petk</small></footer>
-  </div>
+  </div></>
 }
