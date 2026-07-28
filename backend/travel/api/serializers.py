@@ -115,7 +115,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def get_can_edit(self, obj) -> bool:
         user = self.context["request"].user
-        return bool(user.is_authenticated and (user.is_staff or obj.author_id == user.id))
+        return bool(user.is_authenticated and (user.is_superuser or user.is_staff or obj.author_id == user.id))
 
     def get_is_helpful(self, obj) -> bool:
         if hasattr(obj, "viewer_found_helpful"):
@@ -148,12 +148,15 @@ class PlaceRevisionSerializer(serializers.ModelSerializer):
     prefecture = PrefectureSummarySerializer(read_only=True)
     image_url = AbsoluteImageField(source="image", read_only=True)
     gallery_images = PlaceRevisionImageSerializer(many=True, read_only=True)
+    removed_gallery_image_ids = serializers.PrimaryKeyRelatedField(
+        source="removed_gallery_images", many=True, read_only=True
+    )
 
     class Meta:
         model = PlaceRevision
         fields = (
             "id", "status", "review_note", "prefecture", "name", "description",
-            "image_url", "city", "google_maps_url", "official_website",
+            "image_url", "remove_image", "removed_gallery_image_ids", "city", "google_maps_url", "official_website",
             "travel_tips", "best_season", "latitude", "longitude",
             "gallery_images", "created_at", "updated_at", "reviewed_at",
         )
@@ -202,7 +205,7 @@ class PlaceListSerializer(serializers.ModelSerializer):
 
     def get_can_edit(self, obj) -> bool:
         user = self.context["request"].user
-        return bool(user.is_authenticated and (user.is_staff or obj.author_id == user.id))
+        return bool(user.is_authenticated and (user.is_superuser or user.is_staff or obj.author_id == user.id))
 
     def get_is_favorite(self, obj) -> bool:
         if hasattr(obj, "viewer_has_favorite"):
@@ -229,7 +232,7 @@ class PlaceDetailSerializer(PlaceListSerializer):
     def get_latest_revision(self, obj):
         request = self.context["request"]
         if not request.user.is_authenticated or not (
-            request.user.is_staff or obj.author_id == request.user.id
+            request.user.is_superuser or request.user.is_staff or obj.author_id == request.user.id
         ):
             return None
         revisions = getattr(obj, "moderation_revisions", None)
@@ -239,7 +242,7 @@ class PlaceDetailSerializer(PlaceListSerializer):
     def get_deletion_request(self, obj):
         request = self.context["request"]
         if not request.user.is_authenticated or not (
-            request.user.is_staff or obj.author_id == request.user.id
+            request.user.is_superuser or request.user.is_staff or obj.author_id == request.user.id
         ):
             return None
         requests = getattr(obj, "moderation_deletion_requests", None)
@@ -252,22 +255,30 @@ class PlaceDetailSerializer(PlaceListSerializer):
 class PlaceWriteSerializer(serializers.ModelSerializer):
     prefecture_id = serializers.PrimaryKeyRelatedField(source="prefecture", queryset=Prefecture.objects.all())
     image = serializers.ImageField(required=False, allow_null=True)
+    remove_image = serializers.BooleanField(write_only=True, required=False)
 
     class Meta:
         model = Place
-        fields = ("id", "prefecture_id", "name", "description", "image", "city", "google_maps_url", "official_website", "travel_tips", "best_season", "latitude", "longitude", "slug", "status")
+        fields = ("id", "prefecture_id", "name", "description", "image", "remove_image", "city", "google_maps_url", "official_website", "travel_tips", "best_season", "latitude", "longitude", "slug", "status")
         read_only_fields = ("id", "slug", "status")
+
+    def validate(self, attrs):
+        if attrs.get("remove_image") and attrs.get("image"):
+            raise serializers.ValidationError({"image": "Choose a replacement image or remove the current image, not both."})
+        return attrs
 
     def _unique_slug(self, name, prefecture):
         return unique_place_slug(name, prefecture, exclude_place=self.instance)
 
     def create(self, validated_data):
+        validated_data.pop("remove_image", None)
         validated_data["author"] = self.context["request"].user
         validated_data["slug"] = self._unique_slug(validated_data["name"], validated_data["prefecture"])
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         request = self.context["request"]
+        remove_image = validated_data.pop("remove_image", serializers.empty)
         # Every public-client edit to an approved place is moderated. Staff
         # may still make deliberate direct corrections through Django admin,
         # but React and other API clients never bypass the revision workflow.
@@ -294,12 +305,18 @@ class PlaceWriteSerializer(serializers.ModelSerializer):
                         longitude=live_place.longitude,
                     )
                 revision.submitted_by = request.user
+                if remove_image is not serializers.empty:
+                    revision.remove_image = remove_image
+                if validated_data.get("image"):
+                    revision.remove_image = False
                 for field, value in validated_data.items():
                     setattr(revision, field, value)
                 revision.save()
                 self.pending_revision = revision
             return instance
 
+        if remove_image is True:
+            validated_data["image"] = None
         prefecture = validated_data.get("prefecture", instance.prefecture)
         name = validated_data.get("name", instance.name)
         validated_data["slug"] = self._unique_slug(name, prefecture)

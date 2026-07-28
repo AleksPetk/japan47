@@ -8,6 +8,8 @@ from django.utils.text import slugify
 
 from .models import Place, PlaceImage, PlaceRevision
 
+MAX_PLACE_GALLERY_IMAGES = 4
+
 
 def unique_place_slug(name, prefecture, *, exclude_place=None):
     """Return a stable, URL-safe slug that remains unique inside a prefecture."""
@@ -32,11 +34,16 @@ def approve_place_revision(revision, reviewer):
     revision = (
         PlaceRevision.objects.select_for_update()
         .select_related("place", "prefecture")
-        .prefetch_related("gallery_images")
+        .prefetch_related("gallery_images", "removed_gallery_images")
         .get(pk=revision.pk)
     )
     if revision.status != PlaceRevision.Status.PENDING:
         raise ValidationError("Only pending place revisions can be approved.")
+
+    removed_gallery = list(revision.removed_gallery_images.filter(place=place))
+    final_gallery_count = place.gallery_images.count() - len(removed_gallery) + revision.gallery_images.count()
+    if final_gallery_count > MAX_PLACE_GALLERY_IMAGES:
+        raise ValidationError(f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos.")
 
     for field in (
         "prefecture",
@@ -51,13 +58,18 @@ def approve_place_revision(revision, reviewer):
         "longitude",
     ):
         setattr(place, field, getattr(revision, field))
-    if revision.image:
+    if revision.remove_image:
+        place.image = None
+    elif revision.image:
         place.image = revision.image.name
     place.slug = unique_place_slug(place.name, place.prefecture, exclude_place=place)
     place.status = Place.Status.PUBLISHED
     place.reviewed_by = reviewer
     place.reviewed_at = timezone.now()
     place.save()
+
+    for gallery_image in removed_gallery:
+        gallery_image.delete()
 
     next_order = (place.gallery_images.aggregate(max_order=Max("display_order"))["max_order"] or -1) + 1
     for offset, proposed_image in enumerate(revision.gallery_images.all()):

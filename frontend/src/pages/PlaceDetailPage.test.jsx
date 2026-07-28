@@ -17,7 +17,7 @@ vi.mock('../hooks/useApi', () => ({
       name: 'Lake Towada',
       slug: 'lake-towada',
       description: 'A scenic caldera lake.',
-      image_url: null,
+      image_url: 'https://example.test/media/main.jpg',
       city: '',
       best_season: 'autumn',
       status: 'published',
@@ -32,7 +32,10 @@ vi.mock('../hooks/useApi', () => ({
       is_visited: true,
       latest_revision: { status: 'pending', review_note: '' },
       deletion_request: null,
-      gallery_images: [],
+      gallery_images: [
+        { id: 21, image_url: 'https://example.test/media/gallery-1.jpg', thumbnail_url: 'https://example.test/media/gallery-1-thumb.jpg', caption: 'Night view' },
+        { id: 22, image_url: 'https://example.test/media/gallery-2.jpg', thumbnail_url: null, caption: '' },
+      ],
       reviews: [],
       related_places: [],
       nearby_places: [],
@@ -49,6 +52,16 @@ beforeEach(() => {
 })
 
 describe('PlaceDetailPage viewer state', () => {
+  it('keeps one main image and renders additional photos in a gallery before reviews', () => {
+    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: 'Open Lake Towada main image' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /gallery image/ })).toHaveLength(2)
+    const gallerySection = screen.getByRole('heading', { name: 'Gallery' }).closest('section')
+    const reviewsSection = screen.getByRole('heading', { name: 'Reviews' }).closest('section')
+    expect(gallerySection.compareDocumentPosition(reviewsSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('publishes TouristAttraction structured data from the place response', async () => {
     render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
 

@@ -189,14 +189,14 @@ class PlaceRevisionAdmin(admin.ModelAdmin):
     inlines = (PlaceRevisionImageInline,)
     readonly_fields = (
         "place", "submitted_by", "status", "comparison", "prefecture", "name",
-        "description", "image_large_preview", "city", "google_maps_url",
+        "description", "image_large_preview", "gallery_removals", "city", "google_maps_url",
         "official_website", "travel_tips", "best_season", "latitude", "longitude",
         "reviewed_by", "reviewed_at", "created_at", "updated_at",
     )
     fieldsets = (
         ("Moderation", {"fields": ("place", "submitted_by", "status", "comparison", "review_note")}),
         ("Proposed values", {"fields": (
-            "prefecture", "name", "description", "image_large_preview", "city",
+            "prefecture", "name", "description", "image_large_preview", "gallery_removals", "city",
             "google_maps_url", "official_website", "travel_tips", "best_season",
             "latitude", "longitude",
         )}),
@@ -209,7 +209,14 @@ class PlaceRevisionAdmin(admin.ModelAdmin):
 
     @admin.display(description="Proposed cover image")
     def image_large_preview(self, obj):
+        if obj.remove_image:
+            return "Remove the published cover image"
         return image_preview(obj.image, large=True) if obj.image else "No cover-image change"
+
+    @admin.display(description="Published gallery removals")
+    def gallery_removals(self, obj):
+        names = [image.caption or image.image.name for image in obj.removed_gallery_images.all()]
+        return format_html("<br>".join("{}" for _ in names), *names) if names else "No gallery removals"
 
     @admin.display(description="Published versus proposed")
     def comparison(self, obj):

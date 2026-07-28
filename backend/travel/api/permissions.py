@@ -11,4 +11,7 @@ class IsOwnerOrStaff(BasePermission):
             or getattr(obj, "owner", None)
             or getattr(obj, "reporter", None)
         )
-        return bool(request.user.is_authenticated and (request.user.is_staff or owner == request.user))
+        return bool(
+            request.user.is_authenticated
+            and (request.user.is_superuser or request.user.is_staff or owner == request.user)
+        )

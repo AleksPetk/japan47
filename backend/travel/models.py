@@ -372,6 +372,16 @@ class PlaceRevision(models.Model):
         validators=[validate_image_size, validate_image_safety],
         help_text="Optional replacement for the currently published cover image.",
     )
+    remove_image = models.BooleanField(
+        default=False,
+        help_text="Remove the published cover image when this revision is approved.",
+    )
+    removed_gallery_images = models.ManyToManyField(
+        "PlaceImage",
+        blank=True,
+        related_name="pending_removal_revisions",
+        help_text="Published gallery images to remove when this revision is approved.",
+    )
     city = models.CharField(max_length=100, blank=True)
     google_maps_url = models.URLField(blank=True)
     official_website = models.URLField(blank=True)

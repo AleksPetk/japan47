@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from travel.models import Favorite, Place, PlaceDeletionRequest, PlaceImage, PlaceRevision, Review, ReviewVote, VisitedPlace
+from travel.place_revisions import MAX_PLACE_GALLERY_IMAGES
 from travel.services import annotate_places_with_ratings
 
 from ..filters import PlaceFilter
@@ -38,7 +39,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
     ordering = ("-created_at", "-pk")
 
     def get_permissions(self):
-        if self.action in {"create", "update", "partial_update", "destroy", "deletion_request"}:
+        if self.action in {"create", "update", "partial_update", "destroy", "deletion_request", "images", "gallery_image", "revision_image"}:
             classes = [IsAuthenticated, IsOwnerOrStaff]
         else:
             classes = [AllowAny]
@@ -87,7 +88,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
                     "revisions",
                     queryset=PlaceRevision.objects.select_related(
                         "prefecture", "prefecture__region"
-                    ).prefetch_related("gallery_images"),
+                    ).prefetch_related("gallery_images", "removed_gallery_images"),
                     to_attr="moderation_revisions",
                 ),
                 Prefetch(
@@ -97,7 +98,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
                 ),
             )
         user = self.request.user
-        if user.is_authenticated and user.is_staff:
+        if user.is_authenticated and (user.is_superuser or user.is_staff):
             return queryset
         if user.is_authenticated:
             return queryset.filter(
@@ -164,7 +165,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
         """Owners must use the moderated deletion workflow; staff retain API control."""
 
         place = self.get_object()
-        if not request.user.is_staff:
+        if not (request.user.is_superuser or request.user.is_staff):
             return JsonResponse(
                 {
                     "error": {
@@ -189,7 +190,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
         """Queue an owner's reason without changing or hiding the live place."""
 
         place = self.get_object()
-        if request.user.is_staff:
+        if request.user.is_staff and not request.user.is_superuser:
             return JsonResponse(
                 {
                     "error": {
@@ -249,29 +250,73 @@ class PlaceViewSet(viewsets.ModelViewSet):
         place = self.get_object()
         if not (request.user.is_staff or place.author_id == request.user.id):
             return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can add gallery images."}}, status=403)
-        if place.status == Place.Status.PUBLISHED:
-            revision = PlaceRevision.objects.filter(
-                place=place,
-                status=PlaceRevision.Status.PENDING,
-            ).first()
-            if revision is None:
-                return JsonResponse(
-                    {
-                        "error": {
-                            "code": "pending_revision_required",
-                            "message": "Save the proposed place changes before adding gallery images.",
-                        }
-                    },
-                    status=409,
+        with transaction.atomic():
+            place = Place.objects.select_for_update().get(pk=place.pk)
+            if place.status == Place.Status.PUBLISHED:
+                revision = PlaceRevision.objects.select_for_update().filter(
+                    place=place,
+                    status=PlaceRevision.Status.PENDING,
+                ).first()
+                if revision is None:
+                    return JsonResponse(
+                        {"error": {"code": "pending_revision_required", "message": "Save the proposed place changes before adding gallery images."}},
+                        status=409,
+                    )
+                effective_count = (
+                    place.gallery_images.count()
+                    - revision.removed_gallery_images.filter(place=place).count()
+                    + revision.gallery_images.count()
                 )
-            serializer = PlaceRevisionImageSerializer(data=request.data, context={"request": request})
+                if effective_count >= MAX_PLACE_GALLERY_IMAGES:
+                    return JsonResponse({"error": {"code": "validation_error", "message": "Please correct the highlighted fields.", "fields": {"gallery_images": [f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos."]}}}, status=400)
+                serializer = PlaceRevisionImageSerializer(data=request.data, context={"request": request})
+                serializer.is_valid(raise_exception=True)
+                serializer.save(revision=revision)
+                return JsonResponse({**serializer.data, "pending_revision": True}, status=201)
+            if place.gallery_images.count() >= MAX_PLACE_GALLERY_IMAGES:
+                return JsonResponse({"error": {"code": "validation_error", "message": "Please correct the highlighted fields.", "fields": {"gallery_images": [f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos."]}}}, status=400)
+            serializer = PlaceImageSerializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
-            serializer.save(revision=revision)
-            return JsonResponse({**serializer.data, "pending_revision": True}, status=201)
-        serializer = PlaceImageSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save(place=place)
+            serializer.save(place=place)
         return JsonResponse(serializer.data, status=201)
+
+    @action(detail=True, methods=["post", "delete"], permission_classes=[IsAuthenticated], url_path=r"images/(?P<image_id>[^/.]+)")
+    def gallery_image(self, request, pk=None, image_id=None):
+        place = self.get_object()
+        if not (request.user.is_staff or place.author_id == request.user.id):
+            return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can manage gallery images."}}, status=403)
+        image = place.gallery_images.filter(pk=image_id).first()
+        if image is None:
+            return JsonResponse({"error": {"code": "not_found", "message": "Gallery image not found."}}, status=404)
+        if place.status == Place.Status.PUBLISHED:
+            revision = PlaceRevision.objects.filter(place=place, status=PlaceRevision.Status.PENDING).first()
+            if revision is None:
+                return JsonResponse({"error": {"code": "pending_revision_required", "message": "Save the proposed place changes before managing gallery images."}}, status=409)
+            if request.method == "DELETE":
+                revision.removed_gallery_images.add(image)
+            else:
+                revision.removed_gallery_images.remove(image)
+            return JsonResponse({"pending_revision": True, "removed": request.method == "DELETE"})
+        if request.method != "DELETE":
+            return JsonResponse({"error": {"code": "method_not_allowed", "message": "This gallery image is not pending removal."}}, status=405)
+        image.delete()
+        response = JsonResponse({}, status=204)
+        response.content = b""
+        return response
+
+    @action(detail=True, methods=["delete"], permission_classes=[IsAuthenticated], url_path=r"revision-images/(?P<image_id>[^/.]+)")
+    def revision_image(self, request, pk=None, image_id=None):
+        place = self.get_object()
+        if not (request.user.is_staff or place.author_id == request.user.id):
+            return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can manage proposed gallery images."}}, status=403)
+        revision = PlaceRevision.objects.filter(place=place, status=PlaceRevision.Status.PENDING).first()
+        image = revision.gallery_images.filter(pk=image_id).first() if revision else None
+        if image is None:
+            return JsonResponse({"error": {"code": "not_found", "message": "Proposed gallery image not found."}}, status=404)
+        image.delete()
+        response = JsonResponse({}, status=204)
+        response.content = b""
+        return response
 
     @action(detail=True, methods=["post", "delete"], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):

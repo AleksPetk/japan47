@@ -477,6 +477,46 @@ class PlaceMutationApiTests(ApiFixture):
         public_detail = self.client.get(f"/api/v1/places/{self.published.pk}/").json()
         self.assertIsNone(public_detail["deletion_request"])
 
+    def test_superuser_can_request_deletion_for_any_place_but_regular_staff_cannot(self):
+        request_url = f"/api/v1/places/{self.published.pk}/deletion-request/"
+        self.authenticate(self.staff)
+        blocked = self.client.post(
+            request_url,
+            {"reason": "A regular administrator should use the admin workflow."},
+        )
+        self.assertEqual(blocked.status_code, 400)
+        self.assertEqual(blocked.json()["error"]["code"], "staff_action_required")
+
+        superuser = User.objects.create_superuser(
+            "superuser",
+            "superuser@example.com",
+            "StrongPass123!",
+        )
+        self.authenticate(superuser)
+        created = self.client.post(
+            request_url,
+            {"reason": "The superuser is deliberately requesting moderation."},
+        )
+
+        self.assertEqual(created.status_code, 201)
+        deletion_request = PlaceDeletionRequest.objects.get(place=self.published)
+        self.assertEqual(deletion_request.requested_by, superuser)
+        self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.PENDING)
+        self.assertTrue(Place.objects.filter(pk=self.published.pk).exists())
+
+    def test_superuser_can_delete_a_place_directly(self):
+        superuser = User.objects.create_superuser(
+            "superuser",
+            "superuser@example.com",
+            "StrongPass123!",
+        )
+        self.authenticate(superuser)
+
+        response = self.client.delete(f"/api/v1/places/{self.published.pk}/")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Place.objects.filter(pk=self.published.pk).exists())
+
     def test_rejected_deletion_keeps_place_and_allows_a_new_request(self):
         deletion_request = PlaceDeletionRequest.objects.create(
             place=self.published,
@@ -630,6 +670,98 @@ class UploadApiTests(ApiFixture):
         self.assertEqual(self.published.image.name, revision.image.name)
         self.assertTrue(self.published.image.storage.exists(self.published.image.name))
         self.assertFalse(self.published.image.storage.exists(approved_image_name))
+
+    def test_published_cover_removal_is_hidden_until_revision_approval(self):
+        self.published.image = self.image_file("approved.png", "blue")
+        self.published.save()
+        self.published.refresh_from_db()
+        approved_image_name = self.published.image.name
+
+        self.authenticate()
+        response = self.client.patch(
+            f"/api/v1/places/{self.published.pk}/",
+            {"remove_image": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        revision = PlaceRevision.objects.get(place=self.published)
+        self.assertTrue(revision.remove_image)
+        self.published.refresh_from_db()
+        self.assertEqual(self.published.image.name, approved_image_name)
+
+        approve_place_revision(revision, self.staff)
+        self.published.refresh_from_db()
+        self.assertFalse(self.published.image)
+        self.assertFalse(self.published.image.storage.exists(approved_image_name))
+
+    def test_published_gallery_removal_waits_for_revision_approval(self):
+        gallery_image = PlaceImage.objects.create(
+            place=self.published,
+            image=self.image_file("approved-gallery.png", "blue"),
+        )
+        image_name = gallery_image.image.name
+        self.authenticate()
+        self.client.patch(
+            f"/api/v1/places/{self.published.pk}/",
+            {"description": "Proposed description."},
+            format="json",
+        )
+
+        response = self.client.delete(
+            f"/api/v1/places/{self.published.pk}/images/{gallery_image.pk}/"
+        )
+        self.assertEqual(response.status_code, 200)
+        revision = PlaceRevision.objects.get(place=self.published)
+        self.assertTrue(revision.removed_gallery_images.filter(pk=gallery_image.pk).exists())
+        self.assertTrue(PlaceImage.objects.filter(pk=gallery_image.pk).exists())
+
+        approve_place_revision(revision, self.staff)
+        self.assertFalse(PlaceImage.objects.filter(pk=gallery_image.pk).exists())
+        self.assertFalse(gallery_image.image.storage.exists(image_name))
+
+    def test_gallery_upload_rejects_more_than_four_effective_images(self):
+        for index in range(4):
+            PlaceImage.objects.create(
+                place=self.published,
+                image=self.image_file(f"gallery-{index}.png", "blue"),
+            )
+        self.authenticate()
+        self.client.patch(
+            f"/api/v1/places/{self.published.pk}/",
+            {"description": "Proposed description."},
+            format="json",
+        )
+
+        response = self.client.post(
+            f"/api/v1/places/{self.published.pk}/images/",
+            {"image": self.image_file("fifth.png", "green")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("gallery_images", response.json()["error"]["fields"])
+        self.assertFalse(PlaceRevisionImage.objects.exists())
+
+    def test_owner_can_remove_a_proposed_gallery_image(self):
+        self.authenticate()
+        self.client.patch(
+            f"/api/v1/places/{self.published.pk}/",
+            {"description": "Proposed description."},
+            format="json",
+        )
+        upload = self.client.post(
+            f"/api/v1/places/{self.published.pk}/images/",
+            {"image": self.image_file("proposed.png", "green")},
+            format="multipart",
+        )
+        image_id = upload.json()["id"]
+
+        response = self.client.delete(
+            f"/api/v1/places/{self.published.pk}/revision-images/{image_id}/"
+        )
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(PlaceRevisionImage.objects.filter(pk=image_id).exists())
 
     def test_coordinate_validation_returns_field_error(self):
         self.authenticate()
