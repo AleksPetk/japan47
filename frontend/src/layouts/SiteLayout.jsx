@@ -38,6 +38,6 @@ export default function SiteLayout() {
     </header>
     {location.state?.successMessage && <div className="site-notice" role="status">{location.state.successMessage}</div>}
     <main id="main"><Outlet /></main>
-    <footer><nav aria-label="Support and legal"><Link to="/contact">Contact Us</Link><Link to="/privacy">Privacy Policy</Link><Link to="/terms">Terms of Use</Link></nav><p>© {new Date().getFullYear()} Japan 47. All rights reserved.</p><small>Created by Aleks Petk</small></footer>
+    <footer><nav aria-label="Support and legal"><Link to="/contact">Contact Us</Link><Link to="/support">Support Japan47</Link><Link to="/privacy">Privacy Policy</Link><Link to="/terms">Terms of Use</Link></nav><p>© {new Date().getFullYear()} Japan 47. All rights reserved.</p><small>Created by Aleks Petk</small></footer>
   </div></>
 }

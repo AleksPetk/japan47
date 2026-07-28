@@ -15,6 +15,19 @@ afterEach(() => {
 })
 
 describe('Japan 47 routes', () => {
+  it('renders the public Support Japan47 page and safe Ko-fi link', () => {
+    renderRoute('/support')
+    expect(screen.getByRole('heading', { name: 'Support Japan47', level: 1 })).toBeInTheDocument()
+    expect(screen.getByText(/supporting does not unlock premium content/i)).toBeInTheDocument()
+    const supportLinks = screen.getAllByRole('link', { name: 'Support on Ko-fi' })
+    supportLinks.forEach((link) => {
+      expect(link).toHaveAttribute('href', 'https://ko-fi.com/japan47')
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    })
+    expect(screen.getByRole('contentinfo')).toHaveTextContent('Support Japan47')
+  })
+
   it('shows loading and then renders API-backed home content', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => json({ latest_places: [], top_places: [], top_prefectures: [], top_regions: [], top_contributors: [] }))
     renderRoute('/')

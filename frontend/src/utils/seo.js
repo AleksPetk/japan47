@@ -22,6 +22,11 @@ const routeMetadata = {
     description: 'Find places to visit across Japan, with traveler reviews, ratings, local tips, and community recommendations.',
     canonicalPath: '/places',
   },
+  '/support': {
+    title: 'Support Japan47 — Help Keep the Community Project Running',
+    description: 'Learn how optional support helps cover Japan47 hosting, maintenance, image storage, and future web and mobile development.',
+    canonicalPath: '/support',
+  },
 }
 
 const sectionLabels = {
@@ -29,6 +34,7 @@ const sectionLabels = {
   contributors: 'Contributor',
   'my-travel': 'My Travel',
   contact: 'Contact',
+  support: 'Support Japan47',
   login: 'Login',
   register: 'Register',
   'check-email': 'Check Your Email',
