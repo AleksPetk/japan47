@@ -1,0 +1,67 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+.npm/
+.yarn/cache/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.cache/
+.eslintcache
+coverage/
+
+# Native
+.kotlin/
+.gradle/
+.cxx/
+*.orig.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+credentials.json
+google-services.json
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# Personal AI-tool configuration and instructions
+.claude/
+AGENTS.md
+CLAUDE.md
+
+# Local environment files. Keep the public template tracked.
+.env
+.env.*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+/ios
+/android
+
+# Generated install/build artifacts
+*.apk
+*.aab
+*.apks
+*.ipa
+eas-build-*.tar.gz

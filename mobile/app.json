@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Japan47",
+    "slug": "japan47-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/japan47-app-icon.png",
+    "scheme": "japan47",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.alekspetk.japan47",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FBFAF5",
+        "foregroundImage": "./assets/images/japan47-app-icon.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/japan47-app-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/japan47-logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FBFAF5"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Japan47 uses your photos when you choose a profile, place, gallery, or support image.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5e819c4c-5ca9-4e0d-acc4-3c33a3e95e5a"
+      }
+    },
+    "owner": "alekspetk"
+  }
+}
