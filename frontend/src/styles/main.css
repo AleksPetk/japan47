@@ -78,6 +78,8 @@ p { line-height:1.75; }
 .section-header h2 { margin-bottom:.5rem; }
 .section-header p:last-child { color:var(--muted); margin-bottom:0; }
 .section-header>a { color:var(--red-dark); font-weight:700; white-space:nowrap; }
+.reviews .section-header .button--primary,
+.form-page--small .actions .button--primary { color:#fff!important; }
 .grid { display:grid; gap:1.75rem; }
 .grid--3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .card { overflow:hidden; background:var(--white); border:1px solid rgba(50,58,49,.11); border-radius:18px; box-shadow:0 8px 28px rgba(31,42,31,.065); transition:transform .28s ease,box-shadow .28s ease,border-color .28s ease; }
