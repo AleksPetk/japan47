@@ -101,19 +101,21 @@ export function ChoiceField({ label, value, options, onChange, error, placeholde
   </Field>;
 }
 
-export function ImagePickerField({ label, asset, onChange, multiple = false, error }: {
+export function ImagePickerField({ label, asset, onChange, multiple = false, selectionLimit = 5, error, hint }: {
   label: string;
   asset?: ImagePicker.ImagePickerAsset | ImagePicker.ImagePickerAsset[] | null;
   onChange: (value: ImagePicker.ImagePickerAsset | ImagePicker.ImagePickerAsset[] | null) => void;
   multiple?: boolean;
+  selectionLimit?: number;
   error?: string | string[];
+  hint?: string;
 }) {
   const pick = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsMultipleSelection: multiple, selectionLimit: multiple ? 5 : 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsMultipleSelection: multiple, selectionLimit: multiple ? selectionLimit : 1 });
     if (!result.canceled) onChange(multiple ? result.assets : result.assets[0]);
   };
   const count = Array.isArray(asset) ? asset.length : asset ? 1 : 0;
-  return <Field label={label} error={error} hint={count ? `${count} image${count === 1 ? '' : 's'} selected` : 'JPEG, PNG, WebP, HEIC, or HEIF.'}>
+  return <Field label={label} error={error} hint={count ? `${count} image${count === 1 ? '' : 's'} selected` : hint || 'JPEG, PNG, WebP, HEIC, or HEIF.'}>
     <Button label={count ? 'Choose different image' : 'Choose from photos'} variant="secondary" icon="image-outline" onPress={pick} />
   </Field>;
 }

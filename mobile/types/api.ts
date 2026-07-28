@@ -65,6 +65,8 @@ export type ModerationRevision = {
   name: string;
   description: string;
   image_url: string | null;
+  remove_image: boolean;
+  removed_gallery_image_ids: number[];
   city: string;
   google_maps_url: string;
   official_website: string;

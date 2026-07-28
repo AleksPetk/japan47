@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import {
   Avatar, Button, confirm, Empty, ErrorState, Eyebrow, Input, Loading, Notice,
   Rating, RemoteImage, Screen, Section,
@@ -49,7 +49,7 @@ export default function PlaceDetailScreen() {
     try { await api(`/places/${place.id}/${kind}/`, { method: active ? 'DELETE' : 'POST' }); } catch (requestError) { setData(place); setMessage(firstFieldError(requestError)); }
   });
   const submitDeletion = async () => { setBusy(true); setMessage(''); try { const result = await api<{ message: string; deletion_request: Place['deletion_request'] }>(`/places/${place.id}/deletion-request/`, { method: 'POST', body: jsonBody({ reason: deleteReason.trim() }) }); setData({ ...place, deletion_request: result.deletion_request }); setDeleting(false); setDeleteReason(''); setMessage(result.message); } catch (requestError) { setMessage(firstFieldError(requestError, 'reason')); } finally { setBusy(false); } };
-  const gallery = [{ id: -1, image_url: place.image_url, thumbnail_url: place.image_url, caption: place.name }, ...(place.gallery_images || [])].filter((image) => image.image_url);
+  const gallery = (place.gallery_images || []).filter((image) => image.image_url);
   const ownReview = place.reviews?.find((review) => review.author.id === user?.id);
   return <Screen refreshing={loading} onRefresh={reload}>
     {place.status !== 'published' ? <Notice tone="warning">{place.status}: only you and staff can see this submission.</Notice> : null}
@@ -57,7 +57,7 @@ export default function PlaceDetailScreen() {
     {place.deletion_request?.status === 'pending' ? <Notice tone="warning">Your deletion request is awaiting administrator review.</Notice> : null}
     {message ? <Notice tone="success">{message}</Notice> : null}
     <View><Eyebrow>{place.prefecture.region.label} · {place.prefecture.name}{place.city ? ` · ${place.city}` : ''}</Eyebrow><Text style={styles.title}>{place.name}</Text><View style={styles.titleMeta}><Rating value={place.average_rating} count={place.review_count} large /><Text style={styles.date}>Added by {place.author.display_name}</Text></View></View>
-    <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery}>{gallery.length ? gallery.map((image) => <RemoteImage key={image.id} uri={image.image_url} style={styles.galleryImage} />) : <RemoteImage style={styles.galleryImage} />}</ScrollView>
+    <RemoteImage uri={place.image_url} style={styles.mainImage} />
     <View style={styles.actionGrid}>
       <Button label={place.is_favorite ? 'Saved ♥' : 'Save'} variant={place.is_favorite ? 'primary' : 'secondary'} compact onPress={() => toggle('favorite')} />
       <Button label={place.is_visited ? 'Visited ✓' : 'Mark visited'} variant={place.is_visited ? 'primary' : 'secondary'} compact onPress={() => toggle('visited')} />
@@ -67,6 +67,7 @@ export default function PlaceDetailScreen() {
     {user?.id === place.author.id && place.deletion_request?.status !== 'pending' ? <Button label="Request deletion" variant="danger" onPress={() => setDeleting(true)} /> : null}
     <View style={styles.prose}><Text style={styles.heading}>About this place</Text><Text style={styles.description}>{place.description}</Text>{place.travel_tips ? <Notice><Text style={styles.bold}>Travel tip: </Text>{place.travel_tips}</Notice> : null}</View>
     <View style={styles.facts}><Text style={styles.heading}>Plan your visit</Text><Text style={styles.fact}>Prefecture  ·  {place.prefecture.name}</Text>{place.city ? <Text style={styles.fact}>City  ·  {place.city}</Text> : null}<Text style={styles.fact}>Best season  ·  {place.best_season.replace('_', ' ')}</Text>{place.google_maps_url ? <Button label="Open Google Maps" variant="secondary" onPress={() => Linking.openURL(place.google_maps_url!)} /> : null}{place.official_website ? <Button label="Official website" variant="ghost" onPress={() => Linking.openURL(place.official_website!)} /> : null}</View>
+    {gallery.length ? <Section title="Gallery" eyebrow="More from this place" action={<Text style={styles.galleryCount}>{gallery.length} of 4</Text>}><View style={styles.galleryGrid}>{gallery.map((image) => <View key={image.id} style={styles.galleryTile}><RemoteImage uri={image.thumbnail_url || image.image_url} style={styles.galleryImage} /></View>)}</View></Section> : null}
     <Section title="Reviews" eyebrow="Traveler experiences" action={<Button label={ownReview ? 'Edit yours' : 'Write review'} compact onPress={() => requireAuth(() => router.push({ pathname: '/reviews/form', params: { placeId: String(place.id), ...(ownReview ? { reviewId: String(ownReview.id) } : {}) } }))} />}>
       {place.reviews?.length ? place.reviews.map((review) => <ReviewCard key={review.id} review={review} place={place} reload={reload} />) : <Empty title="No reviews yet" message="Share the first traveler perspective." />}
     </Section>
@@ -80,8 +81,11 @@ const styles = StyleSheet.create({
   title: { color: colors.ink, fontFamily: typography.title, fontWeight: '700', fontSize: 36, lineHeight: 41 },
   titleMeta: { gap: spacing.sm, marginTop: spacing.sm },
   date: { color: colors.muted, fontSize: 12 },
-  gallery: { gap: spacing.sm },
-  galleryImage: { width: 340, maxWidth: '85%', height: 270, borderRadius: radius.lg, backgroundColor: colors.sage },
+  mainImage: { width: '100%', height: 280, borderRadius: radius.lg, backgroundColor: colors.sage, ...shadow },
+  galleryCount: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  galleryTile: { width: '48%', flexGrow: 1, aspectRatio: 4 / 3, overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.sage },
+  galleryImage: { width: '100%', height: '100%' },
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   prose: { gap: spacing.md },
   heading: { color: colors.ink, fontFamily: typography.title, fontWeight: '700', fontSize: 23 },
