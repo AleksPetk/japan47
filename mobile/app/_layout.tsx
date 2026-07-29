@@ -31,6 +31,7 @@ export default function RootLayout() {
       <Stack.Screen name="auth/reset-password" options={{ title: 'Choose a new password' }} />
       <Stack.Screen name="profile/edit" options={{ title: 'Account settings', presentation: 'modal' }} />
       <Stack.Screen name="contact" options={{ title: 'Contact Japan47', presentation: 'modal' }} />
+      <Stack.Screen name="support" options={{ title: 'Support Japan47' }} />
     </Stack>
   </AuthProvider>;
 }
