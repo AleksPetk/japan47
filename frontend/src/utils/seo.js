@@ -27,6 +27,11 @@ const routeMetadata = {
     description: 'Learn how optional support helps cover Japan47 hosting, maintenance, image storage, and future web and mobile development.',
     canonicalPath: '/support',
   },
+  '/delete-account': {
+    title: 'Delete Your Japan47 Account | Japan47',
+    description: 'Learn how to permanently delete your Japan47 account and what happens to your profile, reviews, places, and uploaded images after deletion.',
+    canonicalPath: '/delete-account',
+  },
 }
 
 const sectionLabels = {
@@ -43,6 +48,7 @@ const sectionLabels = {
   'reset-password': 'Reset Password',
   privacy: 'Privacy Policy',
   terms: 'Terms of Use',
+  'delete-account': 'Delete Account',
 }
 
 const privateSections = new Set([

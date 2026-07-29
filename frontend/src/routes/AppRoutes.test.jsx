@@ -15,6 +15,25 @@ afterEach(() => {
 })
 
 describe('Japan 47 routes', () => {
+  it('renders the public account-deletion instructions and links from both legal pages', () => {
+    const { unmount } = renderRoute('/delete-account')
+    expect(screen.getByRole('heading', { name: 'Delete Your Japan47 Account', level: 1 })).toBeInTheDocument()
+    expect(screen.getByText(/account deletion is permanent and cannot be undone/i)).toBeInTheDocument()
+    expect(screen.getByText(/their displayed author becomes.*Japan47 Community/i)).toBeInTheDocument()
+    expect(document.title).toBe('Delete Your Japan47 Account | Japan47')
+    expect(document.querySelector('meta[name="description"]')).toHaveAttribute('content', expect.stringContaining('permanently delete'))
+    expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).queryByRole('link', { name: /Delete Account/i })).not.toBeInTheDocument()
+    unmount()
+
+    const privacy = renderRoute('/privacy')
+    expect(screen.getByRole('heading', { name: /Account Deletion/, level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Delete Account page' })).toHaveAttribute('href', '/delete-account')
+    privacy.unmount()
+
+    renderRoute('/terms')
+    expect(screen.getByRole('link', { name: 'Delete Account page' })).toHaveAttribute('href', '/delete-account')
+  })
+
   it('renders the public Support Japan47 page and safe Ko-fi link', () => {
     renderRoute('/support')
     expect(screen.getByRole('heading', { name: 'Support Japan47', level: 1 })).toBeInTheDocument()
