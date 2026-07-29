@@ -28,7 +28,7 @@ export default function SiteLayout() {
   }
   return <><SEO {...routeMetadata} /><div className="site-shell">
     <a className="skip-link" href="#main">Skip to content</a>
-    <header className="site-header"><Link className="brand" to="/" onClick={close}><img src="/logo.PNG" alt="Japan 47" /></Link>
+    <header className="site-header"><Link className="brand" to="/" onClick={close}><img src="/logo.webp" alt="Japan 47" width="308" height="206" /></Link>
       <button className="menu-toggle" aria-expanded={open} aria-controls="main-nav" onClick={() => setOpen(!open)}><span /><span /><span /><b className="sr-only">Menu</b></button>
       <nav id="main-nav" className={open ? 'nav nav--open' : 'nav'} aria-label="Main navigation">
         {['Home', 'Regions', 'Prefectures', 'Places'].map((label) => <NavLink key={label} onClick={close} to={label === 'Home' ? '/' : `/${label.toLowerCase()}`}>{label}</NavLink>)}

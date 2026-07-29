@@ -99,7 +99,7 @@ function automaticStructuredData({ canonicalUrl, description, title, structuredD
         url: `${SITE_URL}/`,
         logo: {
           '@type': 'ImageObject',
-          url: `${SITE_URL}/logo.PNG`,
+          url: `${SITE_URL}/logo.webp`,
         },
       },
       {
