@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender.mjs",
+    "prerender": "node scripts/prerender.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
     "test": "vitest run",
