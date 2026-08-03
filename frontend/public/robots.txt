@@ -1,6 +1,8 @@
 User-agent: *
 
 Allow: /
+Allow: /api/v1/regions/
+Allow: /api/v1/prefectures/
 
 Disallow: /j47-management/
 Disallow: /profile/

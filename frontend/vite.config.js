@@ -26,7 +26,9 @@ function seoFiles(publicUrl) {
     closeBundle() {
       const urls = sitemapPaths().map((route) => `  <url><loc>${origin}/${route}</loc></url>`).join('\n')
       writeFileSync(resolve('dist/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`)
-      writeFileSync(resolve('dist/robots.txt'), `User-agent: *\n\nAllow: /\n\nDisallow: /j47-management/\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`)
+      // Allow Googlebot to fetch public geography JSON for SPA rendering; keep
+      // the broader /api/ disallow so auth and private endpoints stay blocked.
+      writeFileSync(resolve('dist/robots.txt'), `User-agent: *\n\nAllow: /\nAllow: /api/v1/regions/\nAllow: /api/v1/prefectures/\n\nDisallow: /j47-management/\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`)
     },
   }
 }

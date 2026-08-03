@@ -10,6 +10,22 @@ const templatePath = resolve(distDir, 'index.html')
 
 const origin = (process.env.VITE_PUBLIC_URL || 'https://japan47.alekspetk.com').replace(/\/$/, '')
 
+/** Strings that must never appear in prerendered HTML (runtime async UI). */
+const FORBIDDEN_SNIPPETS = [
+  'Something went wrong',
+  'The request could not be completed.',
+  'Loading Japan 47',
+  'state--error',
+  'state--loading',
+  'state--empty',
+  'Nothing here yet',
+  'Check back again soon.',
+  'No prefectures match',
+  'Try widening your filters.',
+  'No places match',
+  'Try changing your search or filters.',
+]
+
 /** List-page metadata aligned with frontend/src/utils/seo.js routeMetadata. */
 const listRouteMeta = {
   '/': {
@@ -84,11 +100,39 @@ function applyHead(html, { title, description, canonicalPath }) {
   return next
 }
 
-function injectRoot(html, bodyInner) {
+function linkList(items) {
+  return `<ul>${items.map((item) => `<li><a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul>`
+}
+
+function regionPrefectureSections() {
+  return REGIONS.map((region) => {
+    const prefectures = PREFECTURES.filter((item) => item.regionName === region.name)
+    return `
+      <section>
+        <h2>${escapeHtml(region.label)}</h2>
+        <p>${escapeHtml(String(prefectures.length))} prefectures in the ${escapeHtml(region.label)} region.</p>
+        ${linkList(prefectures.map((item) => ({
+          href: `/prefectures/${encodeURIComponent(item.name)}`,
+          label: item.name,
+        })))}
+      </section>`
+  }).join('')
+}
+
+/**
+ * Inject visible route content into #root (replaced when React mounts) and a
+ * durable sr-only copy after #root so geography content remains in the document
+ * after client render without changing React components or layout CSS.
+ */
+function injectPrerender(html, bodyInner) {
   if (!/<div id="root">\s*<\/div>/i.test(html)) {
     throw new Error('Could not find empty #root in built index.html')
   }
-  return html.replace(/<div id="root">\s*<\/div>/i, `<div id="root">${bodyInner}</div>`)
+  const trimmed = bodyInner.trim()
+  return html.replace(
+    /<div id="root">\s*<\/div>/i,
+    `<div id="root">${trimmed}</div><div id="prerender-static" class="sr-only">${trimmed}</div>`,
+  )
 }
 
 function writePage(canonicalPath, html) {
@@ -100,8 +144,20 @@ function writePage(canonicalPath, html) {
   return outputPath
 }
 
-function linkList(items) {
-  return `<ul>${items.map((item) => `<li><a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul>`
+function assertSafeHtml(canonicalPath, html) {
+  for (const snippet of FORBIDDEN_SNIPPETS) {
+    if (html.includes(snippet)) {
+      throw new Error(`Prerendered ${canonicalPath} contains forbidden runtime UI text: ${snippet}`)
+    }
+  }
+}
+
+function assertContains(canonicalPath, html, needles) {
+  for (const needle of needles) {
+    if (!html.includes(needle)) {
+      throw new Error(`Prerendered ${canonicalPath} missing required content: ${needle}`)
+    }
+  }
 }
 
 function buildPages() {
@@ -109,15 +165,19 @@ function buildPages() {
     href: `/regions/${region.name}`,
     label: region.label,
   }))
-  const prefectureLinks = PREFECTURES.map((prefecture) => ({
-    href: `/prefectures/${encodeURIComponent(prefecture.name)}`,
-    label: prefecture.name,
-  }))
+
+  if (REGIONS.length !== 9) {
+    throw new Error(`Expected 9 regions in geography.js, found ${REGIONS.length}`)
+  }
+  if (PREFECTURES.length !== 47) {
+    throw new Error(`Expected 47 prefectures in geography.js, found ${PREFECTURES.length}`)
+  }
 
   const pages = [
     {
       path: '/',
       ...listRouteMeta['/'],
+      required: ['Discover Japan, one region at a time.', ...REGIONS.map((region) => region.label)],
       body: `
         <main>
           <p>日本を旅する</p>
@@ -126,12 +186,15 @@ function buildPages() {
           <p><a href="/regions">Explore the regions</a> · <a href="/prefectures">Browse all 47 prefectures</a> · <a href="/places">Places to discover</a></p>
           <h2>Regions of Japan</h2>
           ${linkList(regionLinks)}
+          <h2>Japan’s prefectures</h2>
+          ${regionPrefectureSections()}
         </main>
       `,
     },
     {
       path: '/regions',
       ...listRouteMeta['/regions'],
+      required: ['Regions of Japan', 'Nine distinct regions', ...REGIONS.map((region) => region.label)],
       body: `
         <main>
           <p>Explore Japan</p>
@@ -139,25 +202,35 @@ function buildPages() {
           <p>Discover the character, landscapes, and prefectures of every region across the archipelago.</p>
           <h2>Nine distinct regions</h2>
           ${linkList(regionLinks)}
+          <h2>Prefectures by region</h2>
+          ${regionPrefectureSections()}
         </main>
       `,
     },
     {
       path: '/prefectures',
       ...listRouteMeta['/prefectures'],
+      required: [
+        'Japan’s prefectures',
+        'Search and compare every prefecture by region, rating, and community contributions.',
+        ...PREFECTURES.map((prefecture) => prefecture.name),
+        ...REGIONS.map((region) => region.label),
+      ],
       body: `
         <main>
           <p>Forty-seven stories</p>
           <h1>Japan’s prefectures</h1>
           <p>Search and compare every prefecture by region, rating, and community contributions.</p>
+          <p>Japan 47 covers all ${PREFECTURES.length} prefectures across ${REGIONS.length} regions.</p>
           <h2>Prefectures to explore</h2>
-          ${linkList(prefectureLinks)}
+          ${regionPrefectureSections()}
         </main>
       `,
     },
     {
       path: '/places',
       ...listRouteMeta['/places'],
+      required: ['Places to discover', 'Regions of Japan', 'Japan’s prefectures', ...REGIONS.map((region) => region.label)],
       body: `
         <main>
           <p>Community guide</p>
@@ -165,12 +238,17 @@ function buildPages() {
           <p>Browse destinations shared by Japan 47 contributors.</p>
           <p>Filter places by region and prefecture, or explore Japan’s geography first.</p>
           <p><a href="/regions">Regions of Japan</a> · <a href="/prefectures">Japan’s prefectures</a></p>
+          <h2>Explore by region</h2>
+          ${linkList(regionLinks)}
+          <h2>Explore by prefecture</h2>
+          ${regionPrefectureSections()}
         </main>
       `,
     },
     {
       path: '/privacy',
       ...listRouteMeta['/privacy'],
+      required: ['Privacy Policy', listRouteMeta['/privacy'].description],
       body: `
         <main>
           <p>Japan 47 information</p>
@@ -185,6 +263,7 @@ function buildPages() {
     {
       path: '/terms',
       ...listRouteMeta['/terms'],
+      required: ['Terms of Use', listRouteMeta['/terms'].description],
       body: `
         <main>
           <p>Japan 47 information</p>
@@ -205,6 +284,7 @@ function buildPages() {
       path: `/regions/${region.name}`,
       title: `${region.label} Region Travel Guide | Japan47`,
       description,
+      required: [region.label, description, ...prefecturesInRegion.map((item) => item.name)],
       body: `
         <main>
           <p><a href="/regions">Regions</a> / ${escapeHtml(region.label)}</p>
@@ -227,6 +307,7 @@ function buildPages() {
       path: `/prefectures/${encodeURIComponent(prefecture.name)}`,
       title: `${prefecture.name} Prefecture Travel Guide | Japan47`,
       description,
+      required: [prefecture.name, prefecture.regionLabel, description],
       body: `
         <main>
           <p><a href="/regions">Regions</a> / <a href="/regions/${escapeHtml(prefecture.regionName)}">${escapeHtml(prefecture.regionLabel)}</a> / ${escapeHtml(prefecture.name)}</p>
@@ -234,6 +315,15 @@ function buildPages() {
           <h1>${escapeHtml(prefecture.name)}</h1>
           <p>${escapeHtml(description)}</p>
           <p><a href="/places?prefecture=${encodeURIComponent(prefecture.name)}">Explore places</a> in ${escapeHtml(prefecture.name)} Prefecture.</p>
+          <p>More prefectures in ${escapeHtml(prefecture.regionLabel)}:</p>
+          ${linkList(
+            PREFECTURES
+              .filter((item) => item.regionName === prefecture.regionName)
+              .map((item) => ({
+                href: `/prefectures/${encodeURIComponent(item.name)}`,
+                label: item.name,
+              })),
+          )}
         </main>
       `,
     })
@@ -253,7 +343,12 @@ function prerender() {
       description: page.description,
       canonicalPath: page.path,
     })
-    html = injectRoot(html, page.body.trim())
+    html = injectPrerender(html, page.body)
+    assertSafeHtml(page.path, html)
+    assertContains(page.path, html, page.required)
+    if (!html.includes('id="prerender-static"')) {
+      throw new Error(`Prerendered ${page.path} missing durable prerender-static block`)
+    }
     written.push(writePage(page.path, html))
   }
 
