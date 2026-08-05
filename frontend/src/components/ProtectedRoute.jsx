@@ -6,5 +6,9 @@ export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   const location = useLocation()
   if (loading) return <LoadingState />
-  return user ? children : <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  return user ? (
+    children
+  ) : (
+    <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  )
 }

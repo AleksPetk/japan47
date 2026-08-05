@@ -1,35 +1,43 @@
-export const SITE_URL = (import.meta.env.VITE_PUBLIC_URL || 'https://japan47.alekspetk.com').replace(/\/$/, '')
+export const SITE_URL = (
+  import.meta.env.VITE_PUBLIC_URL || 'https://japan47.alekspetk.com'
+).replace(/\/$/, '')
 export const DEFAULT_SOCIAL_IMAGE = `${SITE_URL}/images/japan47-og.jpg`
 
 const routeMetadata = {
   '/': {
     title: 'Japan47 — Discover Every Prefecture in Japan',
-    description: 'Explore destinations, regional guides, and community recommendations across all 47 prefectures of Japan.',
+    description:
+      'Explore destinations, regional guides, and community recommendations across all 47 prefectures of Japan.',
     canonicalPath: '/',
   },
   '/regions': {
     title: 'Regions of Japan — Regional Travel Guides | Japan47',
-    description: 'Discover the landscapes, culture, destinations, and prefectures of Japan’s nine distinct regions.',
+    description:
+      'Discover the landscapes, culture, destinations, and prefectures of Japan’s nine distinct regions.',
     canonicalPath: '/regions',
   },
   '/prefectures': {
     title: 'Japan’s 47 Prefectures — Complete Travel Guide | Japan47',
-    description: 'Browse all 47 Japanese prefectures and find community-rated destinations, regional highlights, and travel inspiration.',
+    description:
+      'Browse all 47 Japanese prefectures and find community-rated destinations, regional highlights, and travel inspiration.',
     canonicalPath: '/prefectures',
   },
   '/places': {
     title: 'Places to Visit in Japan — Community Travel Guide | Japan47',
-    description: 'Find places to visit across Japan, with traveler reviews, ratings, local tips, and community recommendations.',
+    description:
+      'Find places to visit across Japan, with traveler reviews, ratings, local tips, and community recommendations.',
     canonicalPath: '/places',
   },
   '/support': {
     title: 'Support Japan47 — Help Keep the Community Project Running',
-    description: 'Learn how optional support helps cover Japan47 hosting, maintenance, image storage, and future web and mobile development.',
+    description:
+      'Learn how optional support helps cover Japan47 hosting, maintenance, image storage, and future web and mobile development.',
     canonicalPath: '/support',
   },
   '/delete-account': {
     title: 'Delete Your Japan47 Account | Japan47',
-    description: 'Learn how to permanently delete your Japan47 account and what happens to your profile, reviews, places, and uploaded images after deletion.',
+    description:
+      'Learn how to permanently delete your Japan47 account and what happens to your profile, reviews, places, and uploaded images after deletion.',
     canonicalPath: '/delete-account',
   },
 }
@@ -52,8 +60,16 @@ const sectionLabels = {
 }
 
 const privateSections = new Set([
-  'profile', 'my-travel', 'contact', 'login', 'register', 'check-email',
-  'verify-email', 'forgot-password', 'reset-password', 'password-reset-success',
+  'profile',
+  'my-travel',
+  'contact',
+  'login',
+  'register',
+  'check-email',
+  'verify-email',
+  'forgot-password',
+  'reset-password',
+  'password-reset-success',
 ])
 
 export function getRouteMetadata(pathname) {
@@ -70,7 +86,9 @@ export function getRouteMetadata(pathname) {
 }
 
 export function summarize(value, fallback, limit = 160) {
-  const text = String(value || fallback || '').replace(/\s+/g, ' ').trim()
+  const text = String(value || fallback || '')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (text.length <= limit) return text
   return `${text.slice(0, limit - 1).trimEnd()}…`
 }
@@ -86,7 +104,11 @@ export function absolutePublicUrl(value) {
 
 export function imageContentType(value) {
   const pathname = (() => {
-    try { return new URL(value, `${SITE_URL}/`).pathname.toLowerCase() } catch { return '' }
+    try {
+      return new URL(value, `${SITE_URL}/`).pathname.toLowerCase()
+    } catch {
+      return ''
+    }
   })()
   if (pathname.endsWith('.png')) return 'image/png'
   if (pathname.endsWith('.webp')) return 'image/webp'

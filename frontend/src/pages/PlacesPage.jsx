@@ -5,14 +5,141 @@ import { useApi } from '../hooks/useApi'
 import PageHero from '../components/PageHero'
 
 export default function PlacesPage() {
-  const [params, setParams] = useSearchParams(); const query = params.toString()
+  const [params, setParams] = useSearchParams()
+  const query = params.toString()
   const { data: prefectures } = useApi('/prefectures/')
   const { data: regions } = useApi('/regions/')
   const { data, loading, error } = useApi(`/places/${query ? `?${query}` : ''}`, [query])
-  const update = (name, value) => { const next = new URLSearchParams(params); value ? next.set(name, value) : next.delete(name); if (name !== 'page') next.delete('page'); setParams(next) }
+  const update = (name, value) => {
+    const next = new URLSearchParams(params)
+    value ? next.set(name, value) : next.delete(name)
+    if (name !== 'page') next.delete('page')
+    setParams(next)
+  }
   const goPage = (page) => update('page', String(page))
-  return <section className="page page--discovery discovery-page--compact-hero places-page"><PageHero eyebrow="Community guide" title="Places to discover" subtitle="Browse destinations shared by Japan 47 contributors." aside={<Link className="button button--primary" to="/places/new">Suggest a place</Link>} />
-    <div className="filters"><label>Search<input value={params.get('search') || ''} onChange={(e) => update('search', e.target.value)} placeholder="Place, city, prefecture" /></label><label>Region<select value={params.get('region') || ''} onChange={(e) => update('region', e.target.value)}><option value="">All regions</option>{regions?.map((region) => <option key={region.name} value={region.name}>{region.label}</option>)}</select></label><label>Prefecture<select value={params.get('prefecture') || ''} onChange={(e) => update('prefecture', e.target.value)}><option value="">All prefectures</option>{prefectures?.map((p) => <option key={p.id}>{p.name}</option>)}</select></label><label>Season<select value={params.get('best_season') || ''} onChange={(e) => update('best_season', e.target.value)}><option value="">Any season</option><option value="spring">Spring</option><option value="summer">Summer</option><option value="autumn">Autumn</option><option value="winter">Winter</option><option value="year_round">Year-round</option></select></label><label>Minimum rating<select value={params.get('min_rating') || ''} onChange={(e) => update('min_rating', e.target.value)}><option value="">Any rating</option>{[4,3,2,1].map((n) => <option key={n} value={n}>{n}+ stars</option>)}</select></label><label>Sort<select value={params.get('ordering') || ''} onChange={(e) => update('ordering', e.target.value)}><option value="">Newest</option><option value="created_at">Oldest</option><option value="-average_rating">Rating: best</option><option value="average_rating">Rating: lowest</option><option value="-review_count">Most reviewed</option></select></label><button onClick={() => setParams({})}>Reset</button></div>
-    {loading ? <LoadingState /> : error ? <ErrorState error={error} /> : data.results.length ? <section className="discovery-results"><header><div><p className="eyebrow">Community picks</p><h2>Travel inspiration</h2></div><span>{data.count} places</span></header><div className="grid grid--3">{data.results.map((place) => <PlaceCard key={place.id} place={place} />)}</div><nav className="pagination" aria-label="Pagination"><button disabled={!data.previous} onClick={() => goPage(data.page - 1)}>← Previous</button><span>Page {data.page} of {data.pages}</span><button disabled={!data.next} onClick={() => goPage(data.page + 1)}>Next →</button></nav></section> : <EmptyState title="No places match" message="Try changing your search or filters." />}
-  </section>
+  return (
+    <section className="page page--discovery discovery-page--compact-hero places-page">
+      <PageHero
+        eyebrow="Community guide"
+        title="Places to discover"
+        subtitle="Browse destinations shared by Japan 47 contributors."
+        aside={
+          <Link className="button button--primary" to="/places/new">
+            Suggest a place
+          </Link>
+        }
+      />
+      <div className="filters">
+        <label>
+          Search
+          <input
+            value={params.get('search') || ''}
+            onChange={(e) => update('search', e.target.value)}
+            placeholder="Place, city, prefecture"
+          />
+        </label>
+        <label>
+          Region
+          <select
+            value={params.get('region') || ''}
+            onChange={(e) => update('region', e.target.value)}
+          >
+            <option value="">All regions</option>
+            {regions?.map((region) => (
+              <option key={region.name} value={region.name}>
+                {region.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Prefecture
+          <select
+            value={params.get('prefecture') || ''}
+            onChange={(e) => update('prefecture', e.target.value)}
+          >
+            <option value="">All prefectures</option>
+            {prefectures?.map((p) => (
+              <option key={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Season
+          <select
+            value={params.get('best_season') || ''}
+            onChange={(e) => update('best_season', e.target.value)}
+          >
+            <option value="">Any season</option>
+            <option value="spring">Spring</option>
+            <option value="summer">Summer</option>
+            <option value="autumn">Autumn</option>
+            <option value="winter">Winter</option>
+            <option value="year_round">Year-round</option>
+          </select>
+        </label>
+        <label>
+          Minimum rating
+          <select
+            value={params.get('min_rating') || ''}
+            onChange={(e) => update('min_rating', e.target.value)}
+          >
+            <option value="">Any rating</option>
+            {[4, 3, 2, 1].map((n) => (
+              <option key={n} value={n}>
+                {n}+ stars
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Sort
+          <select
+            value={params.get('ordering') || ''}
+            onChange={(e) => update('ordering', e.target.value)}
+          >
+            <option value="">Newest</option>
+            <option value="created_at">Oldest</option>
+            <option value="-average_rating">Rating: best</option>
+            <option value="average_rating">Rating: lowest</option>
+            <option value="-review_count">Most reviewed</option>
+          </select>
+        </label>
+        <button onClick={() => setParams({})}>Reset</button>
+      </div>
+      {loading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState error={error} />
+      ) : data.results.length ? (
+        <section className="discovery-results">
+          <header>
+            <div>
+              <p className="eyebrow">Community picks</p>
+              <h2>Travel inspiration</h2>
+            </div>
+            <span>{data.count} places</span>
+          </header>
+          <div className="grid grid--3">
+            {data.results.map((place) => (
+              <PlaceCard key={place.id} place={place} />
+            ))}
+          </div>
+          <nav className="pagination" aria-label="Pagination">
+            <button disabled={!data.previous} onClick={() => goPage(data.page - 1)}>
+              ← Previous
+            </button>
+            <span>
+              Page {data.page} of {data.pages}
+            </span>
+            <button disabled={!data.next} onClick={() => goPage(data.page + 1)}>
+              Next →
+            </button>
+          </nav>
+        </section>
+      ) : (
+        <EmptyState title="No places match" message="Try changing your search or filters." />
+      )}
+    </section>
+  )
 }

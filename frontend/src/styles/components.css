@@ -1,0 +1,265 @@
+.grid {
+  display: grid;
+  gap: 1.75rem;
+}
+.grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.card {
+  overflow: hidden;
+  background: var(--white);
+  border: 1px solid rgba(50, 58, 49, 0.11);
+  border-radius: 18px;
+  box-shadow: 0 8px 28px rgba(31, 42, 31, 0.065);
+  transition:
+    transform 0.28s ease,
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+}
+.card,
+.feature {
+  animation: reveal 0.45s ease both;
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.card:hover {
+  transform: translateY(-7px);
+  border-color: rgba(180, 56, 50, 0.24);
+  box-shadow: 0 22px 48px rgba(31, 42, 31, 0.13);
+}
+.card > a {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.card__image {
+  position: relative;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  background: var(--sage);
+}
+.card__image::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 32%;
+  background: linear-gradient(transparent, rgba(14, 22, 16, 0.34));
+  pointer-events: none;
+}
+.card__image img,
+.card__image .image-placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.card:hover .card__image img {
+  transform: scale(1.045);
+}
+.image-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  background: linear-gradient(135deg, #dbe3d4, #f4eadb);
+  color: rgba(32, 37, 31, 0.3);
+  font-family: serif;
+  font-size: 4rem;
+}
+.rank {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  padding: 0.5rem 0.7rem;
+  color: #fff;
+  background: var(--red);
+  border-radius: 999px;
+  font-family: 'Shippori Mincho';
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+}
+.card__kind {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  padding: 0.35rem 0.65rem;
+  color: #fff;
+  background: rgba(20, 29, 22, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(7px);
+}
+.card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 1.35rem 1.4rem 1.25rem;
+}
+.card__body h3 {
+  font-size: 1.55rem;
+  margin: 0.2rem 0 0.55rem;
+}
+.clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0.25rem 0 1.1rem;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: auto;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(50, 58, 49, 0.1);
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.card__footer > span:last-child {
+  text-align: right;
+}
+.rating {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: var(--muted);
+}
+.rating > span {
+  color: var(--gold);
+}
+.rating strong {
+  color: var(--ink);
+}
+.rating small {
+  margin-left: 0.2rem;
+}
+.rating--large {
+  font-size: 1.25rem;
+}
+.contributor-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.4rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+}
+.contributor-card > b {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: var(--red);
+}
+.contributor-card > img:not(.badge-mini),
+.avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--sage);
+  font-family: 'Shippori Mincho';
+  font-size: 1.5rem;
+}
+.contributor-card h3 {
+  margin: 0;
+}
+.contributor-card p {
+  margin: 0.15rem 0;
+  color: var(--muted);
+}
+.badge-mini {
+  width: 64px;
+  margin-left: auto;
+}
+.japan-map {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 2rem;
+  align-items: center;
+  margin: 0 0 2.5rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #fff 0%, #f5f4ed 100%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(31, 42, 31, 0.06);
+}
+.japan-map nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+}
+.japan-map nav a {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--sage) 72%, var(--white));
+  border-left: 3px solid var(--red);
+  border-radius: 0 10px 10px 0;
+  transform: translateX(calc(var(--map-step) * -2px));
+  transition: 0.2s;
+}
+.japan-map nav a:hover {
+  transform: translateX(2px);
+  background: #f4e2de;
+}
+.japan-map nav span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.image-drop {
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--white);
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.image-drop--active {
+  border-color: var(--red);
+  background: rgba(180, 56, 50, 0.08);
+}
+.image-drop input {
+  width: 100%;
+}
+.image-drop span {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.travel-picker {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.travel-picker label,
+.travel-picker select {
+  min-width: 0;
+  width: 100%;
+}
+.travel-picker button {
+  flex: none;
+}

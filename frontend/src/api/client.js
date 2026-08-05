@@ -13,7 +13,13 @@ export class ApiError extends Error {
 }
 
 export const tokenStore = {
-  get: () => { try { return JSON.parse(localStorage.getItem(TOKEN_KEY)) } catch { return null } },
+  get: () => {
+    try {
+      return JSON.parse(localStorage.getItem(TOKEN_KEY))
+    } catch {
+      return null
+    }
+  },
   set: (tokens) => localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens)),
   clear: () => localStorage.removeItem(TOKEN_KEY),
 }
@@ -28,10 +34,15 @@ async function refreshAccess() {
   const tokens = tokenStore.get()
   if (!tokens?.refresh) return null
   const response = await fetch(`${API_BASE}/auth/refresh/`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh: tokens.refresh }),
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh: tokens.refresh }),
   })
   const data = await parse(response)
-  if (!response.ok) { tokenStore.clear(); return null }
+  if (!response.ok) {
+    tokenStore.clear()
+    return null
+  }
   const next = { access: data.access, refresh: data.refresh || tokens.refresh }
   tokenStore.set(next)
   return next.access
@@ -41,7 +52,8 @@ export async function api(path, options = {}, retry = true) {
   const headers = new Headers(options.headers || {})
   const tokens = tokenStore.get()
   if (tokens?.access) headers.set('Authorization', `Bearer ${tokens.access}`)
-  if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
+  if (options.body && !(options.body instanceof FormData))
+    headers.set('Content-Type', 'application/json')
   const response = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (response.status === 401 && retry && tokens?.refresh) {
     const access = await refreshAccess()

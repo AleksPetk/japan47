@@ -9,16 +9,32 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(Boolean(tokenStore.get()?.access))
 
   const loadUser = useCallback(async () => {
-    if (!tokenStore.get()?.access) { setLoading(false); return null }
-    try { const profile = await api('/profile/'); setUser(profile); return profile }
-    catch { tokenStore.clear(); setUser(null); return null }
-    finally { setLoading(false) }
+    if (!tokenStore.get()?.access) {
+      setLoading(false)
+      return null
+    }
+    try {
+      const profile = await api('/profile/')
+      setUser(profile)
+      return profile
+    } catch {
+      tokenStore.clear()
+      setUser(null)
+      return null
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { loadUser() }, [loadUser])
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
 
   const login = async (username, password) => {
-    const tokens = await api('/auth/login/', { method: 'POST', body: jsonBody({ username, password }) })
+    const tokens = await api('/auth/login/', {
+      method: 'POST',
+      body: jsonBody({ username, password }),
+    })
     tokenStore.set(tokens)
     return loadUser()
   }
@@ -27,7 +43,12 @@ export function AuthProvider({ children }) {
   }
   const logout = async () => {
     const refresh = tokenStore.get()?.refresh
-    try { if (refresh) await api('/auth/logout/', { method: 'POST', body: jsonBody({ refresh }) }) } finally { tokenStore.clear(); setUser(null) }
+    try {
+      if (refresh) await api('/auth/logout/', { method: 'POST', body: jsonBody({ refresh }) })
+    } finally {
+      tokenStore.clear()
+      setUser(null)
+    }
   }
 
   const clearAuth = useCallback(() => {

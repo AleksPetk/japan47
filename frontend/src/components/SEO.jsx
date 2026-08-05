@@ -48,19 +48,27 @@ function schemaLabel(segment) {
 function breadcrumbSchema(canonicalUrl, title) {
   const url = new URL(canonicalUrl)
   const segments = url.pathname.split('/').filter(Boolean)
-  const items = [{
-    '@type': 'ListItem',
-    position: 1,
-    name: 'Home',
-    item: `${SITE_URL}/`,
-  }]
+  const items = [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: `${SITE_URL}/`,
+    },
+  ]
   let path = ''
 
   segments.forEach((segment, index) => {
     path += `/${segment}`
     // Place URLs contain an internal numeric ID before the public slug. It is
     // part of the URL but not a useful breadcrumb for visitors or crawlers.
-    if (segments[0] === 'places' && index === 1 && /^\d+$/.test(segment) && index < segments.length - 1) return
+    if (
+      segments[0] === 'places' &&
+      index === 1 &&
+      /^\d+$/.test(segment) &&
+      index < segments.length - 1
+    )
+      return
     const isCurrentPage = index === segments.length - 1
     items.push({
       '@type': 'ListItem',
@@ -164,7 +172,18 @@ export default function SEO({
     setMeta('name', 'twitter:description', resolvedDescription)
     setMeta('name', 'twitter:image', resolvedImage)
     setJsonLd('structured-data', serializedSchemaData)
-  }, [imageHeight, imageType, imageWidth, resolvedCanonical, resolvedDescription, resolvedImage, robots, serializedSchemaData, title, type])
+  }, [
+    imageHeight,
+    imageType,
+    imageWidth,
+    resolvedCanonical,
+    resolvedDescription,
+    resolvedImage,
+    robots,
+    serializedSchemaData,
+    title,
+    type,
+  ])
 
   return null
 }

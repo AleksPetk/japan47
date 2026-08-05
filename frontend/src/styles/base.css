@@ -1,0 +1,134 @@
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--paper);
+}
+body,
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+img {
+  display: block;
+  max-width: 100%;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button {
+  color: inherit;
+}
+:focus-visible {
+  outline: 3px solid #2779a7;
+  outline-offset: 3px;
+}
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 8px;
+  left: 8px;
+  background: var(--white);
+  padding: 0.8rem;
+  transform: translateY(-150%);
+}
+.skip-link:focus {
+  transform: none;
+}
+#main {
+  min-height: 70vh;
+}
+h1,
+h2,
+h3 {
+  font-family: 'Shippori Mincho', serif;
+  line-height: 1.12;
+  margin-top: 0;
+}
+h1 {
+  font-size: clamp(2.7rem, 7vw, 5.8rem);
+  letter-spacing: -0.045em;
+}
+h2 {
+  font-size: clamp(1.9rem, 4vw, 3.2rem);
+}
+p {
+  line-height: 1.75;
+}
+.eyebrow {
+  color: var(--red);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  padding: 0.7rem 1.25rem;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.2s;
+}
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
+}
+.button--primary {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+.button--primary:hover {
+  background: var(--red-dark);
+}
+.button--ghost {
+  background: rgba(255, 255, 255, 0.7);
+}
+.button--danger {
+  color: #fff;
+  background: #862721;
+  border-color: #862721;
+}
+.button--full {
+  width: 100%;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.back,
+.breadcrumbs {
+  display: inline-block;
+  margin-bottom: 2rem;
+  color: var(--muted);
+}
+.breadcrumbs a {
+  color: var(--red-dark);
+}

@@ -17,7 +17,7 @@ export default function Modal({ title, children, onClose, actions }) {
       if (event.key === 'Escape') onCloseRef.current()
       if (event.key !== 'Tab') return
       const focusable = dialog.current?.querySelectorAll(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )
       if (!focusable?.length) return
       const first = focusable[0]
@@ -37,14 +37,36 @@ export default function Modal({ title, children, onClose, actions }) {
     }
   }, [])
 
-  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section ref={dialog} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <header>
-        <div><p className="eyebrow">Final check</p><h2 id={titleId}>{title}</h2></div>
-        <button ref={closeButton} className="modal__close" type="button" onClick={onClose} aria-label="Close confirmation">×</button>
-      </header>
-      <div className="modal__body">{children}</div>
-      <footer className="modal__actions">{actions}</footer>
-    </section>
-  </div>
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section
+        ref={dialog}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <header>
+          <div>
+            <p className="eyebrow">Final check</p>
+            <h2 id={titleId}>{title}</h2>
+          </div>
+          <button
+            ref={closeButton}
+            className="modal__close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close confirmation"
+          >
+            ×
+          </button>
+        </header>
+        <div className="modal__body">{children}</div>
+        <footer className="modal__actions">{actions}</footer>
+      </section>
+    </div>
+  )
 }

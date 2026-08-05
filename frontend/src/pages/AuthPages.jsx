@@ -13,7 +13,13 @@ function AuthShell({ mode }) {
   const { user, login, register } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const [values, setValues] = useState({ username: '', email: '', password: '', password2: '', legal_consent: false })
+  const [values, setValues] = useState({
+    username: '',
+    email: '',
+    password: '',
+    password2: '',
+    legal_consent: false,
+  })
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [emailNotVerified, setEmailNotVerified] = useState(false)
@@ -51,25 +57,118 @@ function AuthShell({ mode }) {
     }
   }
 
-  return <section className="auth-page"><div className="auth-card">
-    <header><span aria-hidden="true">{registering ? '桜' : '旅'}</span><p className="eyebrow">{registering ? 'Begin your journey' : 'Welcome back'}</p><h1>{registering ? 'Create an account' : 'Login'}</h1></header>
-    <form onSubmit={submit}>
-      {errors.general && <p className="form-error" role="alert">{errors.general}</p>}
-      {emailNotVerified && <Link className="auth-action" to="/check-email">Resend Verification Email</Link>}
-      <FormField label="Username" name="username" errors={errors} required><input id="username" name="username" autoComplete="username" value={values.username} onChange={change} required /></FormField>
-      {registering && <FormField label="Email" name="email" errors={errors} required><input id="email" name="email" type="email" autoComplete="email" value={values.email} onChange={change} required /></FormField>}
-      <FormField label="Password" name="password" errors={errors} required><input id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} value={values.password} onChange={change} required /></FormField>
-      {registering && <FormField label="Confirm password" name="password2" errors={errors} required><input id="password2" name="password2" type="password" autoComplete="new-password" value={values.password2} onChange={change} required /></FormField>}
-      {registering && <div className="consent-field">
-        <input id="legal_consent" name="legal_consent" type="checkbox" checked={values.legal_consent} onChange={change} required />
-        <label htmlFor="legal_consent">I agree to the <Link to="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</Link> and <Link to="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>.</label>
-        {fieldError(errors, 'legal_consent') && <p className="field-error" id="legal_consent-error">{fieldError(errors, 'legal_consent')}</p>}
-      </div>}
-      {!registering && <Link className="auth-card__forgot" to="/forgot-password">Forgot password?</Link>}
-      <button className="button button--primary button--full" disabled={busy}>{busy ? 'Please wait…' : registering ? 'Register' : 'Login'}</button>
-    </form>
-    <p>{registering ? 'Already have an account?' : 'New to Japan 47?'} <Link to={registering ? '/login' : '/register'}>{registering ? 'Login' : 'Create an account'}</Link></p>
-  </div></section>
+  return (
+    <section className="auth-page">
+      <div className="auth-card">
+        <header>
+          <span aria-hidden="true">{registering ? '桜' : '旅'}</span>
+          <p className="eyebrow">{registering ? 'Begin your journey' : 'Welcome back'}</p>
+          <h1>{registering ? 'Create an account' : 'Login'}</h1>
+        </header>
+        <form onSubmit={submit}>
+          {errors.general && (
+            <p className="form-error" role="alert">
+              {errors.general}
+            </p>
+          )}
+          {emailNotVerified && (
+            <Link className="auth-action" to="/check-email">
+              Resend Verification Email
+            </Link>
+          )}
+          <FormField label="Username" name="username" errors={errors} required>
+            <input
+              id="username"
+              name="username"
+              autoComplete="username"
+              value={values.username}
+              onChange={change}
+              required
+            />
+          </FormField>
+          {registering && (
+            <FormField label="Email" name="email" errors={errors} required>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={values.email}
+                onChange={change}
+                required
+              />
+            </FormField>
+          )}
+          <FormField label="Password" name="password" errors={errors} required>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete={registering ? 'new-password' : 'current-password'}
+              value={values.password}
+              onChange={change}
+              required
+            />
+          </FormField>
+          {registering && (
+            <FormField label="Confirm password" name="password2" errors={errors} required>
+              <input
+                id="password2"
+                name="password2"
+                type="password"
+                autoComplete="new-password"
+                value={values.password2}
+                onChange={change}
+                required
+              />
+            </FormField>
+          )}
+          {registering && (
+            <div className="consent-field">
+              <input
+                id="legal_consent"
+                name="legal_consent"
+                type="checkbox"
+                checked={values.legal_consent}
+                onChange={change}
+                required
+              />
+              <label htmlFor="legal_consent">
+                I agree to the{' '}
+                <Link to="/terms" target="_blank" rel="noopener noreferrer">
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </Link>
+                .
+              </label>
+              {fieldError(errors, 'legal_consent') && (
+                <p className="field-error" id="legal_consent-error">
+                  {fieldError(errors, 'legal_consent')}
+                </p>
+              )}
+            </div>
+          )}
+          {!registering && (
+            <Link className="auth-card__forgot" to="/forgot-password">
+              Forgot password?
+            </Link>
+          )}
+          <button className="button button--primary button--full" disabled={busy}>
+            {busy ? 'Please wait…' : registering ? 'Register' : 'Login'}
+          </button>
+        </form>
+        <p>
+          {registering ? 'Already have an account?' : 'New to Japan 47?'}{' '}
+          <Link to={registering ? '/login' : '/register'}>
+            {registering ? 'Login' : 'Create an account'}
+          </Link>
+        </p>
+      </div>
+    </section>
+  )
 }
 
 export const LoginPage = () => <AuthShell mode="login" />

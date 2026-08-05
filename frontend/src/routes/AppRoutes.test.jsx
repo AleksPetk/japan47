@@ -6,8 +6,18 @@ import { AuthProvider } from '../context/AuthContext'
 import AppRoutes from './AppRoutes'
 import { tokenStore } from '../api/client'
 
-const json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
-const renderRoute = (path) => render(<MemoryRouter initialEntries={[path]}><AuthProvider><AppRoutes /></AuthProvider></MemoryRouter>)
+const json = (body, status = 200) =>
+  Promise.resolve(
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  )
+const renderRoute = (path) =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </MemoryRouter>
+  )
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -17,21 +27,40 @@ afterEach(() => {
 describe('Japan 47 routes', () => {
   it('renders the public account-deletion instructions and links from both legal pages', () => {
     const { unmount } = renderRoute('/delete-account')
-    expect(screen.getByRole('heading', { name: 'Delete Your Japan47 Account', level: 1 })).toBeInTheDocument()
-    expect(screen.getByText(/account deletion is permanent and cannot be undone/i)).toBeInTheDocument()
-    expect(screen.getByText(/their displayed author becomes.*Japan47 Community/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Delete Your Japan47 Account', level: 1 })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/account deletion is permanent and cannot be undone/i)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/their displayed author becomes.*Japan47 Community/i)
+    ).toBeInTheDocument()
     expect(document.title).toBe('Delete Your Japan47 Account | Japan47')
-    expect(document.querySelector('meta[name="description"]')).toHaveAttribute('content', expect.stringContaining('permanently delete'))
-    expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).queryByRole('link', { name: /Delete Account/i })).not.toBeInTheDocument()
+    expect(document.querySelector('meta[name="description"]')).toHaveAttribute(
+      'content',
+      expect.stringContaining('permanently delete')
+    )
+    expect(
+      within(screen.getByRole('navigation', { name: 'Main navigation' })).queryByRole('link', {
+        name: /Delete Account/i,
+      })
+    ).not.toBeInTheDocument()
     unmount()
 
     const privacy = renderRoute('/privacy')
     expect(screen.getByRole('heading', { name: /Account Deletion/, level: 2 })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Delete Account page' })).toHaveAttribute('href', '/delete-account')
+    expect(screen.getByRole('link', { name: 'Delete Account page' })).toHaveAttribute(
+      'href',
+      '/delete-account'
+    )
     privacy.unmount()
 
     renderRoute('/terms')
-    expect(screen.getByRole('link', { name: 'Delete Account page' })).toHaveAttribute('href', '/delete-account')
+    expect(screen.getByRole('link', { name: 'Delete Account page' })).toHaveAttribute(
+      'href',
+      '/delete-account'
+    )
   })
 
   it('renders the public Support Japan47 page and safe Ko-fi link', () => {
@@ -48,7 +77,15 @@ describe('Japan 47 routes', () => {
   })
 
   it('shows loading and then renders API-backed home content', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => json({ latest_places: [], top_places: [], top_prefectures: [], top_regions: [], top_contributors: [] }))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      json({
+        latest_places: [],
+        top_places: [],
+        top_prefectures: [],
+        top_regions: [],
+        top_contributors: [],
+      })
+    )
     renderRoute('/')
     expect(screen.getByRole('status')).toHaveTextContent('Loading Japan 47')
     expect(await screen.findByRole('heading', { name: 'The latest places' })).toBeInTheDocument()
@@ -58,16 +95,33 @@ describe('Japan 47 routes', () => {
   })
 
   it('renders a useful API error state', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => json({ error: { code: 'service_unavailable', message: 'Please try later.' } }, 503))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      json({ error: { code: 'service_unavailable', message: 'Please try later.' } }, 503)
+    )
     renderRoute('/regions')
     expect(await screen.findByRole('alert')).toHaveTextContent('Please try later.')
   })
 
   it('submits login credentials and navigates to the requested protected page', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/auth/login/')) return json({ access: 'access-token', refresh: 'refresh-token' })
-      if (String(url).endsWith('/profile/')) return json({ id: 7, display_name: 'Sakura', profile_image_url: null, nickname: 'Sakura', email: 'sakura@example.com' })
-      if (String(url).endsWith('/home/')) return json({ latest_places: [], top_places: [], top_prefectures: [], top_regions: [], top_contributors: [] })
+      if (String(url).endsWith('/auth/login/'))
+        return json({ access: 'access-token', refresh: 'refresh-token' })
+      if (String(url).endsWith('/profile/'))
+        return json({
+          id: 7,
+          display_name: 'Sakura',
+          profile_image_url: null,
+          nickname: 'Sakura',
+          email: 'sakura@example.com',
+        })
+      if (String(url).endsWith('/home/'))
+        return json({
+          latest_places: [],
+          top_places: [],
+          top_prefectures: [],
+          top_regions: [],
+          top_contributors: [],
+        })
       if (String(url).endsWith('/prefectures/')) return json([])
       if (String(url).endsWith('/health/')) return json({ status: 'ok' })
       return json({ status: 'ok' })
@@ -77,15 +131,28 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
     await userEvent.click(screen.getByRole('button', { name: 'Login' }))
     await waitFor(() => expect(screen.getByText('Sakura')).toBeInTheDocument())
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/auth/login/'), expect.objectContaining({ method: 'POST' }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/login/'),
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 
   it('clears authentication and redirects to home after logout', async () => {
     tokenStore.set({ access: 'access-token', refresh: 'refresh-token' })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/profile/')) return json({ id: 7, display_name: 'Sakura', profile_image_url: null })
-      if (String(url).endsWith('/auth/logout/')) return Promise.resolve(new Response(null, { status: 204 }))
-      if (String(url).endsWith('/home/')) return json({ stats: {}, latest_places: [], top_places: [], top_prefectures: [], top_regions: [], top_contributors: [] })
+      if (String(url).endsWith('/profile/'))
+        return json({ id: 7, display_name: 'Sakura', profile_image_url: null })
+      if (String(url).endsWith('/auth/logout/'))
+        return Promise.resolve(new Response(null, { status: 204 }))
+      if (String(url).endsWith('/home/'))
+        return json({
+          stats: {},
+          latest_places: [],
+          top_places: [],
+          top_prefectures: [],
+          top_regions: [],
+          top_contributors: [],
+        })
       if (String(url).endsWith('/places/trending/')) return json({ results: [] })
       if (String(url).endsWith('/regions/')) return json([])
       return json({})
@@ -97,28 +164,40 @@ describe('Japan 47 routes', () => {
     expect(tokenStore.get()).toBeNull()
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/auth/logout/'),
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({ method: 'POST' })
     )
   })
 
   it('keeps discovery filters in the URL-backed API request', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).includes('/places/')) return json({ count: 0, page: 1, pages: 1, next: null, previous: null, results: [] })
+      if (String(url).includes('/places/'))
+        return json({ count: 0, page: 1, pages: 1, next: null, previous: null, results: [] })
       return json([])
     })
     renderRoute('/places?region=kanto&best_season=spring')
     expect(await screen.findByText('No places match')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/places/?region=kanto&best_season=spring'), expect.any(Object))
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/places/?region=kanto&best_season=spring'),
+      expect.any(Object)
+    )
   })
 
   it('redirects anonymous visitors to login and returns them to contact', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/auth/login/')) return json({ access: 'access-token', refresh: 'refresh-token' })
-      if (String(url).endsWith('/profile/')) return json({ id: 9, display_name: 'Aiko', profile_image_url: null, email: 'aiko@example.com' })
-      if (String(url).endsWith('/support/')) return json({
-        default_contact_email: 'aiko@example.com',
-        categories: [{ value: 'account', label: 'Account' }],
-      })
+      if (String(url).endsWith('/auth/login/'))
+        return json({ access: 'access-token', refresh: 'refresh-token' })
+      if (String(url).endsWith('/profile/'))
+        return json({
+          id: 9,
+          display_name: 'Aiko',
+          profile_image_url: null,
+          email: 'aiko@example.com',
+        })
+      if (String(url).endsWith('/support/'))
+        return json({
+          default_contact_email: 'aiko@example.com',
+          categories: [{ value: 'account', label: 'Account' }],
+        })
       return json({})
     })
     renderRoute('/contact')
@@ -127,41 +206,60 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
     await userEvent.click(screen.getByRole('button', { name: 'Login' }))
     expect(await screen.findByRole('heading', { name: 'Contact Us' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByLabelText('Contact email')).toHaveValue('aiko@example.com'))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Contact email')).toHaveValue('aiko@example.com')
+    )
   })
 
   it('reviews values before submitting the support request and shows its reference', async () => {
     tokenStore.set({ access: 'access-token', refresh: 'refresh-token' })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url, options = {}) => {
-      if (String(url).endsWith('/profile/')) return json({ id: 9, display_name: 'Aiko', profile_image_url: null, email: 'aiko@example.com' })
-      if (String(url).endsWith('/support/') && options.method === 'POST') return json({ ticket_id: 'SUP-20260724-0001', status: 'new' }, 201)
-      if (String(url).endsWith('/support/')) return json({
-        default_contact_email: 'aiko@example.com',
-        categories: [{ value: 'bug_report', label: 'Bug Report' }],
-      })
+      if (String(url).endsWith('/profile/'))
+        return json({
+          id: 9,
+          display_name: 'Aiko',
+          profile_image_url: null,
+          email: 'aiko@example.com',
+        })
+      if (String(url).endsWith('/support/') && options.method === 'POST')
+        return json({ ticket_id: 'SUP-20260724-0001', status: 'new' }, 201)
+      if (String(url).endsWith('/support/'))
+        return json({
+          default_contact_email: 'aiko@example.com',
+          categories: [{ value: 'bug_report', label: 'Bug Report' }],
+        })
       return json({})
     })
     renderRoute('/contact')
     await screen.findByRole('heading', { name: 'Contact Us' })
     await userEvent.selectOptions(screen.getByLabelText('Category'), 'bug_report')
     await userEvent.type(screen.getByLabelText('Subject'), 'Map is not loading')
-    await userEvent.type(screen.getByLabelText('Message'), 'The map remains blank after refreshing.')
+    await userEvent.type(
+      screen.getByLabelText('Message'),
+      'The map remains blank after refreshing.'
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Map is not loading')
     expect(screen.getByRole('dialog')).toHaveTextContent('cannot be edited')
     await userEvent.click(screen.getByRole('button', { name: 'Send Request' }))
     expect(await screen.findByText('SUP-20260724-0001')).toBeInTheDocument()
-    const postCall = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith('/support/') && options.method === 'POST')
+    const postCall = fetchMock.mock.calls.find(
+      ([url, options]) => String(url).endsWith('/support/') && options.method === 'POST'
+    )
     expect(postCall[1].body).toBeInstanceOf(FormData)
     expect(postCall[1].body.get('category')).toBe('bug_report')
   })
 
   it('registers without logging in and shows the check-email page', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/auth/register/')) return json({
-        message: 'Your account was created. Confirm your email before signing in.',
-        masked_email: 'sa****@example.com',
-      }, 201)
+      if (String(url).endsWith('/auth/register/'))
+        return json(
+          {
+            message: 'Your account was created. Confirm your email before signing in.',
+            masked_email: 'sa****@example.com',
+          },
+          201
+        )
       return json({})
     })
     renderRoute('/register')
@@ -170,14 +268,27 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
     await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPass123!')
     const registrationForm = screen.getByRole('button', { name: 'Register' }).closest('form')
-    expect(within(registrationForm).getByRole('link', { name: 'Terms of Use' })).toHaveAttribute('target', '_blank')
-    expect(within(registrationForm).getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(within(registrationForm).getByRole('link', { name: 'Terms of Use' })).toHaveAttribute(
+      'target',
+      '_blank'
+    )
+    expect(within(registrationForm).getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer'
+    )
     await userEvent.click(screen.getByLabelText(/I agree to the Terms of Use/))
     await userEvent.click(screen.getByRole('button', { name: 'Register' }))
-    expect(await screen.findByRole('heading', { name: 'Thank You for Registering' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Thank You for Registering' })
+    ).toBeInTheDocument()
     expect(screen.getByText(/sa\*\*\*\*@example.com/)).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/auth/login/'), expect.anything())
-    const registerCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/register/'))
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/auth/login/'),
+      expect.anything()
+    )
+    const registerCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith('/auth/register/')
+    )
     expect(JSON.parse(registerCall[1].body)).toMatchObject({ legal_consent: true })
   })
 
@@ -196,10 +307,27 @@ describe('Japan 47 routes', () => {
   it('requires all account-deletion confirmations, clears auth, and redirects home', async () => {
     tokenStore.set({ access: 'access-token', refresh: 'refresh-token' })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/profile/')) return json({ id: 7, display_name: 'Sakura', nickname: 'Sakura', email: 'sakura@example.com', email_verified: true, profile_image_url: null })
+      if (String(url).endsWith('/profile/'))
+        return json({
+          id: 7,
+          display_name: 'Sakura',
+          nickname: 'Sakura',
+          email: 'sakura@example.com',
+          email_verified: true,
+          profile_image_url: null,
+        })
       if (String(url).endsWith('/auth/account/verify-password/')) return json({ verified: true })
-      if (String(url).endsWith('/auth/account/delete/')) return json({ message: 'Your account has been permanently deleted.' })
-      if (String(url).endsWith('/home/')) return json({ stats: {}, latest_places: [], top_places: [], top_prefectures: [], top_regions: [], top_contributors: [] })
+      if (String(url).endsWith('/auth/account/delete/'))
+        return json({ message: 'Your account has been permanently deleted.' })
+      if (String(url).endsWith('/home/'))
+        return json({
+          stats: {},
+          latest_places: [],
+          top_places: [],
+          top_prefectures: [],
+          top_regions: [],
+          top_contributors: [],
+        })
       if (String(url).endsWith('/places/trending/')) return json({ results: [] })
       return json({})
     })
@@ -220,15 +348,27 @@ describe('Japan 47 routes', () => {
     expect(await screen.findByRole('heading', { name: /Discover Japan/ })).toBeInTheDocument()
     expect(screen.getByText('Your account has been permanently deleted.')).toBeInTheDocument()
     expect(tokenStore.get()).toBeNull()
-    const deleteCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/auth/account/delete/'))
-    expect(JSON.parse(deleteCall[1].body)).toEqual({ password: 'StrongPass123!', confirmation: 'DELETE' })
+    const deleteCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith('/auth/account/delete/')
+    )
+    expect(JSON.parse(deleteCall[1].body)).toEqual({
+      password: 'StrongPass123!',
+      confirmation: 'DELETE',
+    })
   })
 
   it('shows a resend action when valid credentials belong to an unverified account', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/auth/login/')) return json({
-        error: { code: 'EMAIL_NOT_VERIFIED', message: 'Confirm your email address before signing in.' },
-      }, 401)
+      if (String(url).endsWith('/auth/login/'))
+        return json(
+          {
+            error: {
+              code: 'EMAIL_NOT_VERIFIED',
+              message: 'Confirm your email address before signing in.',
+            },
+          },
+          401
+        )
       return json({})
     })
     renderRoute('/login')
@@ -236,20 +376,32 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('Password'), 'StrongPass123!')
     await userEvent.click(screen.getByRole('button', { name: 'Login' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Confirm your email address')
-    expect(screen.getByRole('link', { name: 'Resend Verification Email' })).toHaveAttribute('href', '/check-email')
+    expect(screen.getByRole('link', { name: 'Resend Verification Email' })).toHaveAttribute(
+      'href',
+      '/check-email'
+    )
   })
 
   it('renders verification success from the backend result', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => json({ result: 'success', message: 'Email Confirmed Successfully' }))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      json({ result: 'success', message: 'Email Confirmed Successfully' })
+    )
     renderRoute('/verify-email/signed-token')
-    expect(await screen.findByRole('heading', { name: 'Email Confirmed Successfully' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Email Confirmed Successfully' })
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Sign In' })).toHaveAttribute('href', '/login')
   })
 
   it('submits password recovery and completes a reset without displaying the token', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
-      if (String(url).endsWith('/auth/password-reset/request/')) return json({ message: 'If an account exists for that email address, we have sent password-reset instructions.' })
-      if (String(url).endsWith('/auth/password-reset/confirm/')) return json({ result: 'success', message: 'Password Changed Successfully' })
+      if (String(url).endsWith('/auth/password-reset/request/'))
+        return json({
+          message:
+            'If an account exists for that email address, we have sent password-reset instructions.',
+        })
+      if (String(url).endsWith('/auth/password-reset/confirm/'))
+        return json({ result: 'success', message: 'Password Changed Successfully' })
       return json({})
     })
     const forgot = renderRoute('/forgot-password')
@@ -263,18 +415,28 @@ describe('Japan 47 routes', () => {
     await userEvent.type(screen.getByLabelText('New Password'), 'NewStrongPass456!')
     await userEvent.type(screen.getByLabelText('Confirm New Password'), 'NewStrongPass456!')
     await userEvent.click(screen.getByRole('button', { name: 'Change Password' }))
-    expect(await screen.findByRole('heading', { name: 'Password Changed Successfully' })).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/auth/password-reset/confirm/'), expect.objectContaining({ method: 'POST' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Password Changed Successfully' })
+    ).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/password-reset/confirm/'),
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 
   it('displays password-validator errors beside the reset password field', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => json({
-      error: {
-        code: 'validation_error',
-        message: 'Please correct the highlighted fields.',
-        fields: { new_password: ['This password is too common.'] },
-      },
-    }, 400))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      json(
+        {
+          error: {
+            code: 'validation_error',
+            message: 'Please correct the highlighted fields.',
+            fields: { new_password: ['This password is too common.'] },
+          },
+        },
+        400
+      )
+    )
     renderRoute('/reset-password/dWlk/reset-token')
     await userEvent.type(screen.getByLabelText('New Password'), 'password')
     await userEvent.type(screen.getByLabelText('Confirm New Password'), 'password')

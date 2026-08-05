@@ -33,8 +33,18 @@ vi.mock('../hooks/useApi', () => ({
       latest_revision: { status: 'pending', review_note: '' },
       deletion_request: null,
       gallery_images: [
-        { id: 21, image_url: 'https://example.test/media/gallery-1.jpg', thumbnail_url: 'https://example.test/media/gallery-1-thumb.jpg', caption: 'Night view' },
-        { id: 22, image_url: 'https://example.test/media/gallery-2.jpg', thumbnail_url: null, caption: '' },
+        {
+          id: 21,
+          image_url: 'https://example.test/media/gallery-1.jpg',
+          thumbnail_url: 'https://example.test/media/gallery-1-thumb.jpg',
+          caption: 'Night view',
+        },
+        {
+          id: 22,
+          image_url: 'https://example.test/media/gallery-2.jpg',
+          thumbnail_url: null,
+          caption: '',
+        },
       ],
       reviews: [],
       related_places: [],
@@ -53,20 +63,38 @@ beforeEach(() => {
 
 describe('PlaceDetailPage viewer state', () => {
   it('keeps one main image and renders additional photos in a gallery before reviews', () => {
-    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/places/12/lake-towada']}>
+        <Routes>
+          <Route path="/places/:id/:slug" element={<PlaceDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
 
     expect(screen.getByRole('button', { name: 'Open Lake Towada main image' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /gallery image/ })).toHaveLength(2)
     const gallerySection = screen.getByRole('heading', { name: 'Gallery' }).closest('section')
     const reviewsSection = screen.getByRole('heading', { name: 'Reviews' }).closest('section')
-    expect(gallerySection.compareDocumentPosition(reviewsSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      gallerySection.compareDocumentPosition(reviewsSection) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 
   it('publishes TouristAttraction structured data from the place response', async () => {
-    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/places/12/lake-towada']}>
+        <Routes>
+          <Route path="/places/:id/:slug" element={<PlaceDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
 
-    await waitFor(() => expect(document.querySelector('script[data-jsonld="structured-data"]')).toBeInTheDocument())
-    const graph = JSON.parse(document.querySelector('script[data-jsonld="structured-data"]').textContent)['@graph']
+    await waitFor(() =>
+      expect(document.querySelector('script[data-jsonld="structured-data"]')).toBeInTheDocument()
+    )
+    const graph = JSON.parse(
+      document.querySelector('script[data-jsonld="structured-data"]').textContent
+    )['@graph']
     expect(graph.find((schema) => schema['@type'] === 'TouristAttraction')).toMatchObject({
       name: 'Lake Towada',
       description: 'A scenic caldera lake.',
@@ -80,7 +108,13 @@ describe('PlaceDetailPage viewer state', () => {
   })
 
   it('immediately unmarks and remarks a visited place with the correct methods', async () => {
-    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/places/12/lake-towada']}>
+        <Routes>
+          <Route path="/places/:id/:slug" element={<PlaceDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
 
     expect(screen.getByText(/approved version/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Visited ✓' }))
@@ -94,12 +128,26 @@ describe('PlaceDetailPage viewer state', () => {
 
   it('submits an owner deletion reason for admin review instead of deleting directly', async () => {
     apiMock.mockResolvedValueOnce({
-      deletion_request: { id: 4, status: 'pending', reason: 'This listing is no longer valid.', admin_note: '' },
+      deletion_request: {
+        id: 4,
+        status: 'pending',
+        reason: 'This listing is no longer valid.',
+        admin_note: '',
+      },
     })
-    render(<MemoryRouter initialEntries={['/places/12/lake-towada']}><Routes><Route path="/places/:id/:slug" element={<PlaceDetailPage />} /></Routes></MemoryRouter>)
+    render(
+      <MemoryRouter initialEntries={['/places/12/lake-towada']}>
+        <Routes>
+          <Route path="/places/:id/:slug" element={<PlaceDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
 
     await userEvent.click(screen.getByRole('button', { name: 'Request deletion' }))
-    await userEvent.type(screen.getByLabelText('Why should this place be deleted?'), 'This listing is no longer valid.')
+    await userEvent.type(
+      screen.getByLabelText('Why should this place be deleted?'),
+      'This listing is no longer valid.'
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Send deletion request' }))
 
     expect(apiMock).toHaveBeenCalledWith('/places/12/deletion-request/', {
