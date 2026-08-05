@@ -35,14 +35,16 @@ def _send_resend_email(*, to, subject, text, html_body, purpose, idempotency_sou
         logger.error("Transactional email is not configured (purpose=%s).", purpose)
         raise EmailDeliveryError("Transactional email is temporarily unavailable.")
 
-    payload = json.dumps({
-        "from": settings.DEFAULT_FROM_EMAIL,
-        "to": [to],
-        "subject": subject,
-        "text": text,
-        "html": html_body,
-        "tags": [{"name": "category", "value": purpose}],
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "from": settings.DEFAULT_FROM_EMAIL,
+            "to": [to],
+            "subject": subject,
+            "text": text,
+            "html": html_body,
+            "tags": [{"name": "category", "value": purpose}],
+        }
+    ).encode("utf-8")
     idempotency_key = hashlib.sha256(idempotency_source.encode("utf-8")).hexdigest()
     request = Request(
         RESEND_EMAILS_URL,
@@ -72,7 +74,9 @@ def _send_resend_email(*, to, subject, text, html_body, purpose, idempotency_sou
         raw_detail = exc.read(2048).decode("utf-8", "replace")
         try:
             provider_detail = json.loads(raw_detail)
-            detail = provider_detail.get("message") or provider_detail.get("name") or "provider-error"
+            detail = (
+                provider_detail.get("message") or provider_detail.get("name") or "provider-error"
+            )
         except json.JSONDecodeError:
             detail = raw_detail.strip() or "non-json-provider-error"
         # Provider errors can mention submitted values. Preserve the useful
@@ -89,7 +93,9 @@ def _send_resend_email(*, to, subject, text, html_body, purpose, idempotency_sou
         )
         raise EmailDeliveryError("Transactional email is temporarily unavailable.") from exc
     except (URLError, TimeoutError, OSError) as exc:
-        logger.error("Resend could not be reached (purpose=%s, error=%s).", purpose, type(exc).__name__)
+        logger.error(
+            "Resend could not be reached (purpose=%s, error=%s).", purpose, type(exc).__name__
+        )
         raise EmailDeliveryError("Transactional email is temporarily unavailable.") from exc
 
 

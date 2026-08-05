@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
-
 from travel.accounts.email_service import send_password_reset_message, send_verification_message
 from travel.accounts.services import request_password_reset_email, send_verification_email
 
@@ -113,9 +112,13 @@ class ResendEmailServiceTests(SimpleTestCase):
         self.assertIn("Forgot your password? No worries.", payload["html"])
         self.assertIn("Choose a New Password", payload["html"])
         self.assertIn("Choose a new password for your Japan47 account.", payload["html"])
-        self.assertIn("This reset link expires in 1 hour and can only be used once.", payload["html"])
+        self.assertIn(
+            "This reset link expires in 1 hour and can only be used once.", payload["html"]
+        )
         self.assertIn(reset_url, payload["text"])
-        self.assertIn("Your password will not change unless you use the link above.", payload["text"])
+        self.assertIn(
+            "Your password will not change unless you use the link above.", payload["text"]
+        )
 
     @override_settings(
         RESEND_API_KEY="re_test_value",

@@ -7,7 +7,6 @@ from django.core.files.base import ContentFile
 from django.db.models import Avg, Count, Exists, OuterRef, Prefetch
 from PIL import Image, ImageOps
 
-
 # Image policy is centralized so every upload path produces consistent output.
 
 MAX_IMAGE_WIDTH = 1200
@@ -30,6 +29,7 @@ BADGE_LEVELS = (
 
 # Contributor progression
 
+
 def get_badge_progress(points):
     """Return the badge and within-level progress for a point total."""
 
@@ -43,11 +43,7 @@ def get_badge_progress(points):
             break
 
     current = BADGE_LEVELS[current_index]
-    next_level = (
-        BADGE_LEVELS[current_index + 1]
-        if current_index + 1 < len(BADGE_LEVELS)
-        else None
-    )
+    next_level = BADGE_LEVELS[current_index + 1] if current_index + 1 < len(BADGE_LEVELS) else None
 
     if next_level is None:
         progress_percent = 100
@@ -83,6 +79,7 @@ def get_contributor_stats(published_place_count, review_count):
 
 # Rating aggregation
 
+
 def annotate_places_with_ratings(queryset):
     """Add review average and count to every place in a queryset."""
 
@@ -98,12 +95,8 @@ def personalize_places(queryset, user):
     from travel.models import Favorite, VisitedPlace
 
     return annotate_places_with_ratings(queryset).annotate(
-        viewer_has_favorite=Exists(
-            Favorite.objects.filter(user=user, place_id=OuterRef("pk"))
-        ),
-        viewer_has_visited=Exists(
-            VisitedPlace.objects.filter(user=user, place_id=OuterRef("pk"))
-        ),
+        viewer_has_favorite=Exists(Favorite.objects.filter(user=user, place_id=OuterRef("pk"))),
+        viewer_has_visited=Exists(VisitedPlace.objects.filter(user=user, place_id=OuterRef("pk"))),
     )
 
 
@@ -125,9 +118,7 @@ def prefetch_prefectures_with_rating_data(queryset):
 
     rated_places = annotate_places_with_ratings(
         Place.objects.filter(status=Place.Status.PUBLISHED)
-    ).filter(
-        average_rating__isnull=False
-    )
+    ).filter(average_rating__isnull=False)
     return queryset.prefetch_related(
         Prefetch("places", queryset=rated_places, to_attr="rating_places")
     )
@@ -139,9 +130,7 @@ def prefetch_regions_with_rating_data(queryset):
     from travel.models import Prefecture
 
     prefectures = prefetch_prefectures_with_rating_data(Prefecture.objects.all())
-    return queryset.prefetch_related(
-        Prefetch("prefectures", queryset=prefectures)
-    )
+    return queryset.prefetch_related(Prefetch("prefectures", queryset=prefectures))
 
 
 def apply_prefecture_rating(prefecture):
@@ -188,12 +177,13 @@ def apply_region_ratings(regions):
 
 # Image processing
 
+
 def process_model_image(model):
     """Resize and convert a model image after the model is saved."""
 
     if not model.image:
         return
-    
+
     image_path = Path(model.image.path)
 
     # Copy into memory so Pillow closes the source before it is overwritten.
@@ -221,15 +211,11 @@ def process_model_image(model):
         if image_path != new_path:
             image_path.unlink()
 
-            model.image.name = str(
-                Path(model.image.name).with_suffix(".webp")
-            )
+            model.image.name = str(Path(model.image.name).with_suffix(".webp"))
 
             """Update only the database field without calling model.save()
                 again and restarting the image-processing service."""
-            model.__class__.objects.filter(pk=model.pk).update(
-                image=model.image.name
-            )
+            model.__class__.objects.filter(pk=model.pk).update(image=model.image.name)
     elif should_resize:
         image.save(image_path, quality=JPEG_QUALITY, optimize=True)
 
@@ -252,9 +238,7 @@ def process_profile_image(profile):
         method=Image.Resampling.LANCZOS,
     )
 
-    if image.mode in ("RGBA", "LA") or (
-        image.mode == "P" and "transparency" in image.info
-    ):
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
         rgba_image = image.convert("RGBA")
         background = Image.new("RGB", rgba_image.size, "white")
         background.paste(rgba_image, mask=rgba_image.getchannel("A"))
@@ -267,9 +251,7 @@ def process_profile_image(profile):
 
     if image_path != new_path:
         image_path.unlink()
-        profile.profile_image.name = str(
-            Path(profile.profile_image.name).with_suffix(".jpg")
-        )
+        profile.profile_image.name = str(Path(profile.profile_image.name).with_suffix(".jpg"))
         profile.__class__.objects.filter(pk=profile.pk).update(
             profile_image=profile.profile_image.name
         )

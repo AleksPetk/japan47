@@ -5,7 +5,6 @@ from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
-
 from travel.models import SupportTicket
 
 from ..support_serializers import SupportTicketCreateSerializer
@@ -34,7 +33,13 @@ class SupportTicketView(generics.GenericAPIView):
                 "screenshot": {
                     "optional": True,
                     "max_size_mb": 5,
-                    "accepted_types": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"],
+                    "accepted_types": [
+                        "image/jpeg",
+                        "image/png",
+                        "image/webp",
+                        "image/heic",
+                        "image/heif",
+                    ],
                 },
             }
         )

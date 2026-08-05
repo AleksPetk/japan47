@@ -1,13 +1,13 @@
-from django.contrib.auth import get_user_model
+from urllib.parse import urlsplit, urlunsplit
+
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Count, F, IntegerField, Q, Value
 from django.http import JsonResponse
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
-from urllib.parse import urlsplit, urlunsplit
-
 from travel.models import Place, Prefecture, Region
 from travel.services import (
     annotate_places_with_ratings,
@@ -114,7 +114,8 @@ class HomeView(generics.GenericAPIView):
         rated_places = list(places.exclude(average_rating=None))
         global_average = (
             sum(item.average_rating for item in rated_places) / len(rated_places)
-            if rated_places else 3.5
+            if rated_places
+            else 3.5
         )
         top_places = sorted(
             rated_places,
@@ -146,9 +147,7 @@ class HomeView(generics.GenericAPIView):
                     prefecture_count=Count("prefectures", distinct=True),
                     published_place_count=Count(
                         "prefectures__places",
-                        filter=Q(
-                            prefectures__places__status=Place.Status.PUBLISHED
-                        ),
+                        filter=Q(prefectures__places__status=Place.Status.PUBLISHED),
                         distinct=True,
                     ),
                 )
@@ -185,43 +184,35 @@ class HomeView(generics.GenericAPIView):
         )
         contributor_data = []
         for contributor in contributors:
-            item = UserSummarySerializer(
-                contributor, context={"request": request}
-            ).data
+            item = UserSummarySerializer(contributor, context={"request": request}).data
             item["stats"] = get_contributor_stats(
                 contributor.published_place_count,
                 contributor.contributor_review_count,
             )
             contributor_data.append(item)
         response_data = {
-                "stats": {
-                    "regions": Region.objects.count(),
-                    "prefectures": Prefecture.objects.count(),
-                    "places": Place.objects.filter(status=Place.Status.PUBLISHED).count(),
-                    "contributors": User.objects.filter(is_active=True, profile__isnull=False).count(),
-                },
-                "latest_places": list(
-                    PlaceListSerializer(
-                        latest, many=True, context={"request": request}
-                    ).data
-                ),
-                "top_places": list(
-                    PlaceListSerializer(
-                        top_places, many=True, context={"request": request}
-                    ).data
-                ),
-                "top_prefectures": list(
-                    PrefectureSummarySerializer(
-                        top_prefectures, many=True, context={"request": request}
-                    ).data
-                ),
-                "top_regions": list(
-                    RegionSerializer(
-                        top_regions, many=True, context={"request": request}
-                    ).data
-                ),
-                "top_contributors": contributor_data,
-            }
+            "stats": {
+                "regions": Region.objects.count(),
+                "prefectures": Prefecture.objects.count(),
+                "places": Place.objects.filter(status=Place.Status.PUBLISHED).count(),
+                "contributors": User.objects.filter(is_active=True, profile__isnull=False).count(),
+            },
+            "latest_places": list(
+                PlaceListSerializer(latest, many=True, context={"request": request}).data
+            ),
+            "top_places": list(
+                PlaceListSerializer(top_places, many=True, context={"request": request}).data
+            ),
+            "top_prefectures": list(
+                PrefectureSummarySerializer(
+                    top_prefectures, many=True, context={"request": request}
+                ).data
+            ),
+            "top_regions": list(
+                RegionSerializer(top_regions, many=True, context={"request": request}).data
+            ),
+            "top_contributors": contributor_data,
+        }
         if not request.user.is_authenticated:
             cache.set(cache_key, cache_safe_home_payload(response_data), timeout=300)
         return JsonResponse(response_data)
@@ -243,14 +234,10 @@ class SearchView(generics.GenericAPIView):
                 | Q(city__icontains=query)
                 | Q(prefecture__name__icontains=query)
             )
-            .select_related(
-                "author", "author__profile", "prefecture", "prefecture__region"
-            )
+            .select_related("author", "author__profile", "prefecture", "prefecture__region")
         )[:10]
         prefectures = (
-            Prefecture.objects.filter(
-                Q(name__icontains=query) | Q(description__icontains=query)
-            )
+            Prefecture.objects.filter(Q(name__icontains=query) | Q(description__icontains=query))
             .select_related("region")
             .annotate(
                 published_place_count=Count(
@@ -270,21 +257,19 @@ class SearchView(generics.GenericAPIView):
                     prefecture_count=Count("prefectures", distinct=True),
                     published_place_count=Count(
                         "prefectures__places",
-                        filter=Q(
-                            prefectures__places__status=Place.Status.PUBLISHED
-                        ),
+                        filter=Q(prefectures__places__status=Place.Status.PUBLISHED),
                         distinct=True,
                     ),
-                )[:10]
+                )[
+                    :10
+                ]
             )
         )
         apply_region_ratings(regions)
         return JsonResponse(
             {
                 "regions": list(
-                    RegionSerializer(
-                        regions, many=True, context={"request": request}
-                    ).data
+                    RegionSerializer(regions, many=True, context={"request": request}).data
                 ),
                 "prefectures": list(
                     PrefectureSummarySerializer(
@@ -292,9 +277,7 @@ class SearchView(generics.GenericAPIView):
                     ).data
                 ),
                 "places": list(
-                    PlaceListSerializer(
-                        places, many=True, context={"request": request}
-                    ).data
+                    PlaceListSerializer(places, many=True, context={"request": request}).data
                 ),
             }
         )

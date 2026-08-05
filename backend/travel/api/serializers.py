@@ -1,10 +1,16 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-
+from travel.accounts.email_service import EmailDeliveryError
+from travel.accounts.services import (
+    invalidate_user_refresh_tokens,
+    normalize_email,
+    normalize_username,
+    send_verification_email,
+)
 from travel.models import (
     Collection,
     CollectionPlace,
@@ -23,10 +29,8 @@ from travel.models import (
     Review,
     VisitedPlace,
 )
-from travel.services import BADGE_LEVELS, get_contributor_stats
 from travel.place_revisions import unique_place_slug
-from travel.accounts.email_service import EmailDeliveryError
-from travel.accounts.services import invalidate_user_refresh_tokens, normalize_email, normalize_username, send_verification_email
+from travel.services import BADGE_LEVELS, get_contributor_stats
 
 User = get_user_model()
 
@@ -55,7 +59,11 @@ class UserSummarySerializer(serializers.ModelSerializer):
         if not profile or not profile.profile_image:
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(profile.profile_image.url) if request else profile.profile_image.url
+        return (
+            request.build_absolute_uri(profile.profile_image.url)
+            if request
+            else profile.profile_image.url
+        )
 
 
 class RegionSerializer(serializers.ModelSerializer):
@@ -67,7 +75,17 @@ class RegionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Region
-        fields = ("id", "name", "label", "description", "image_url", "display_order", "average_rating", "prefecture_count", "published_place_count")
+        fields = (
+            "id",
+            "name",
+            "label",
+            "description",
+            "image_url",
+            "display_order",
+            "average_rating",
+            "prefecture_count",
+            "published_place_count",
+        )
 
 
 class PrefectureSummarySerializer(serializers.ModelSerializer):
@@ -78,7 +96,16 @@ class PrefectureSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Prefecture
-        fields = ("id", "name", "description", "image_url", "display_order", "average_rating", "published_place_count", "region")
+        fields = (
+            "id",
+            "name",
+            "description",
+            "image_url",
+            "display_order",
+            "average_rating",
+            "published_place_count",
+            "region",
+        )
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -93,29 +120,60 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ("id", "place_id", "place_name", "place_slug", "prefecture_name", "author", "rating", "comment", "created_at", "updated_at", "can_edit", "helpful_count", "is_helpful")
+        fields = (
+            "id",
+            "place_id",
+            "place_name",
+            "place_slug",
+            "prefecture_name",
+            "author",
+            "rating",
+            "comment",
+            "created_at",
+            "updated_at",
+            "can_edit",
+            "helpful_count",
+            "is_helpful",
+        )
         read_only_fields = ("created_at", "updated_at")
 
     def validate_place(self, place):
         request = self.context["request"]
-        if place.status != Place.Status.PUBLISHED and not (request.user.is_staff or place.author_id == request.user.id):
+        if place.status != Place.Status.PUBLISHED and not (
+            request.user.is_staff or place.author_id == request.user.id
+        ):
             raise serializers.ValidationError("Reviews can only be added to accessible places.")
         return place
 
     def validate(self, attrs):
         request = self.context.get("request")
         place = attrs.get("place", getattr(self.instance, "place", None))
-        if place and place.status != Place.Status.PUBLISHED and not (
-            request and request.user.is_authenticated and (request.user.is_staff or place.author_id == request.user.id)
+        if (
+            place
+            and place.status != Place.Status.PUBLISHED
+            and not (
+                request
+                and request.user.is_authenticated
+                and (request.user.is_staff or place.author_id == request.user.id)
+            )
         ):
-            raise serializers.ValidationError({"place_id": "Reviews can only be added to accessible places."})
-        if not self.instance and request and Review.objects.filter(place=place, author=request.user).exists():
+            raise serializers.ValidationError(
+                {"place_id": "Reviews can only be added to accessible places."}
+            )
+        if (
+            not self.instance
+            and request
+            and Review.objects.filter(place=place, author=request.user).exists()
+        ):
             raise serializers.ValidationError({"place_id": "You have already reviewed this place."})
         return attrs
 
     def get_can_edit(self, obj) -> bool:
         user = self.context["request"].user
-        return bool(user.is_authenticated and (user.is_superuser or user.is_staff or obj.author_id == user.id))
+        return bool(
+            user.is_authenticated
+            and (user.is_superuser or user.is_staff or obj.author_id == user.id)
+        )
 
     def get_is_helpful(self, obj) -> bool:
         if hasattr(obj, "viewer_found_helpful"):
@@ -155,10 +213,26 @@ class PlaceRevisionSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlaceRevision
         fields = (
-            "id", "status", "review_note", "prefecture", "name", "description",
-            "image_url", "remove_image", "removed_gallery_image_ids", "city", "google_maps_url", "official_website",
-            "travel_tips", "best_season", "latitude", "longitude",
-            "gallery_images", "created_at", "updated_at", "reviewed_at",
+            "id",
+            "status",
+            "review_note",
+            "prefecture",
+            "name",
+            "description",
+            "image_url",
+            "remove_image",
+            "removed_gallery_image_ids",
+            "city",
+            "google_maps_url",
+            "official_website",
+            "travel_tips",
+            "best_season",
+            "latitude",
+            "longitude",
+            "gallery_images",
+            "created_at",
+            "updated_at",
+            "reviewed_at",
         )
 
 
@@ -175,7 +249,12 @@ class PlaceDeletionRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlaceDeletionRequest
         fields = (
-            "id", "status", "reason", "admin_note", "created_at", "reviewed_at",
+            "id",
+            "status",
+            "reason",
+            "admin_note",
+            "created_at",
+            "reviewed_at",
         )
         read_only_fields = fields
 
@@ -192,7 +271,26 @@ class PlaceListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Place
-        fields = ("id", "name", "slug", "description", "image_url", "city", "best_season", "status", "is_platform_managed", "created_at", "updated_at", "average_rating", "review_count", "prefecture", "author", "can_edit", "is_favorite", "is_visited")
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "description",
+            "image_url",
+            "city",
+            "best_season",
+            "status",
+            "is_platform_managed",
+            "created_at",
+            "updated_at",
+            "average_rating",
+            "review_count",
+            "prefecture",
+            "author",
+            "can_edit",
+            "is_favorite",
+            "is_visited",
+        )
 
     def get_author(self, obj) -> dict:
         if obj.author_id:
@@ -205,7 +303,10 @@ class PlaceListSerializer(serializers.ModelSerializer):
 
     def get_can_edit(self, obj) -> bool:
         user = self.context["request"].user
-        return bool(user.is_authenticated and (user.is_superuser or user.is_staff or obj.author_id == user.id))
+        return bool(
+            user.is_authenticated
+            and (user.is_superuser or user.is_staff or obj.author_id == user.id)
+        )
 
     def get_is_favorite(self, obj) -> bool:
         if hasattr(obj, "viewer_has_favorite"):
@@ -227,7 +328,17 @@ class PlaceDetailSerializer(PlaceListSerializer):
     deletion_request = serializers.SerializerMethodField()
 
     class Meta(PlaceListSerializer.Meta):
-        fields = PlaceListSerializer.Meta.fields + ("google_maps_url", "official_website", "travel_tips", "latitude", "longitude", "gallery_images", "reviews", "latest_revision", "deletion_request")
+        fields = PlaceListSerializer.Meta.fields + (
+            "google_maps_url",
+            "official_website",
+            "travel_tips",
+            "latitude",
+            "longitude",
+            "gallery_images",
+            "reviews",
+            "latest_revision",
+            "deletion_request",
+        )
 
     def get_latest_revision(self, obj):
         request = self.context["request"]
@@ -253,18 +364,38 @@ class PlaceDetailSerializer(PlaceListSerializer):
 
 
 class PlaceWriteSerializer(serializers.ModelSerializer):
-    prefecture_id = serializers.PrimaryKeyRelatedField(source="prefecture", queryset=Prefecture.objects.all())
+    prefecture_id = serializers.PrimaryKeyRelatedField(
+        source="prefecture", queryset=Prefecture.objects.all()
+    )
     image = serializers.ImageField(required=False, allow_null=True)
     remove_image = serializers.BooleanField(write_only=True, required=False)
 
     class Meta:
         model = Place
-        fields = ("id", "prefecture_id", "name", "description", "image", "remove_image", "city", "google_maps_url", "official_website", "travel_tips", "best_season", "latitude", "longitude", "slug", "status")
+        fields = (
+            "id",
+            "prefecture_id",
+            "name",
+            "description",
+            "image",
+            "remove_image",
+            "city",
+            "google_maps_url",
+            "official_website",
+            "travel_tips",
+            "best_season",
+            "latitude",
+            "longitude",
+            "slug",
+            "status",
+        )
         read_only_fields = ("id", "slug", "status")
 
     def validate(self, attrs):
         if attrs.get("remove_image") and attrs.get("image"):
-            raise serializers.ValidationError({"image": "Choose a replacement image or remove the current image, not both."})
+            raise serializers.ValidationError(
+                {"image": "Choose a replacement image or remove the current image, not both."}
+            )
         return attrs
 
     def _unique_slug(self, name, prefecture):
@@ -273,7 +404,9 @@ class PlaceWriteSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("remove_image", None)
         validated_data["author"] = self.context["request"].user
-        validated_data["slug"] = self._unique_slug(validated_data["name"], validated_data["prefecture"])
+        validated_data["slug"] = self._unique_slug(
+            validated_data["name"], validated_data["prefecture"]
+        )
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -285,10 +418,14 @@ class PlaceWriteSerializer(serializers.ModelSerializer):
         if instance.status == Place.Status.PUBLISHED:
             with transaction.atomic():
                 live_place = Place.objects.select_for_update().get(pk=instance.pk)
-                revision = PlaceRevision.objects.select_for_update().filter(
-                    place=live_place,
-                    status=PlaceRevision.Status.PENDING,
-                ).first()
+                revision = (
+                    PlaceRevision.objects.select_for_update()
+                    .filter(
+                        place=live_place,
+                        status=PlaceRevision.Status.PENDING,
+                    )
+                    .first()
+                )
                 if revision is None:
                     revision = PlaceRevision(
                         place=live_place,
@@ -350,7 +487,26 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ("id", "username", "email", "email_verified", "nickname", "display_name", "profile_image", "profile_image_url", "joined_at", "stats", "places", "reviews", "is_owner", "follower_count", "following_count", "is_following", "favorites", "recent_activity")
+        fields = (
+            "id",
+            "username",
+            "email",
+            "email_verified",
+            "nickname",
+            "display_name",
+            "profile_image",
+            "profile_image_url",
+            "joined_at",
+            "stats",
+            "places",
+            "reviews",
+            "is_owner",
+            "follower_count",
+            "following_count",
+            "is_following",
+            "favorites",
+            "recent_activity",
+        )
 
     def get_is_owner(self, obj) -> bool:
         return self.context["request"].user == obj.user
@@ -366,12 +522,14 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_stats(self, obj) -> dict:
         stats = get_contributor_stats(obj.published_place_count, obj.contributor_review_count)
         if self.get_is_owner(obj):
-            stats.update({
-                "favorite_count": obj.favorite_count,
-                "visited_count": obj.visited_count,
-                "prefectures_visited": obj.prefectures_visited,
-                "prefecture_coverage_percent": round(obj.prefectures_visited / 47 * 100, 1),
-            })
+            stats.update(
+                {
+                    "favorite_count": obj.favorite_count,
+                    "visited_count": obj.visited_count,
+                    "prefectures_visited": obj.prefectures_visited,
+                    "prefecture_coverage_percent": round(obj.prefectures_visited / 47 * 100, 1),
+                }
+            )
         return stats
 
     def get_places(self, obj) -> list:
@@ -450,9 +608,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
         if attrs["password"] != attrs["password2"]:
             raise serializers.ValidationError({"password2": "Passwords do not match."})
         if attrs["legal_consent"] is not True:
-            raise serializers.ValidationError({
-                "legal_consent": "You must agree to the Terms of Use and Privacy Policy."
-            })
+            raise serializers.ValidationError(
+                {"legal_consent": "You must agree to the Terms of Use and Privacy Policy."}
+            )
         validate_password(attrs["password"])
         return attrs
 
@@ -506,7 +664,9 @@ class SearchResponseSerializer(serializers.Serializer):
 class FavoriteSerializer(serializers.ModelSerializer):
     place = PlaceListSerializer(read_only=True)
     place_id = serializers.PrimaryKeyRelatedField(
-        source="place", queryset=Place.objects.filter(status=Place.Status.PUBLISHED), write_only=True
+        source="place",
+        queryset=Place.objects.filter(status=Place.Status.PUBLISHED),
+        write_only=True,
     )
 
     class Meta:
@@ -523,7 +683,9 @@ class FavoriteSerializer(serializers.ModelSerializer):
 class VisitedPlaceSerializer(serializers.ModelSerializer):
     place = PlaceListSerializer(read_only=True)
     place_id = serializers.PrimaryKeyRelatedField(
-        source="place", queryset=Place.objects.filter(status=Place.Status.PUBLISHED), write_only=True
+        source="place",
+        queryset=Place.objects.filter(status=Place.Status.PUBLISHED),
+        write_only=True,
     )
 
     class Meta:
@@ -549,13 +711,20 @@ class CollectionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Collection
-        fields = ("id", "name", "description", "is_public", "places", "place_ids", "created_at", "updated_at")
+        fields = (
+            "id",
+            "name",
+            "description",
+            "is_public",
+            "places",
+            "place_ids",
+            "created_at",
+            "updated_at",
+        )
         read_only_fields = ("created_at", "updated_at")
 
     def validate_name(self, name):
-        queryset = Collection.objects.filter(
-            owner=self.context["request"].user, name=name.strip()
-        )
+        queryset = Collection.objects.filter(owner=self.context["request"].user, name=name.strip())
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)
         if queryset.exists():
@@ -585,7 +754,9 @@ class CollectionSerializer(serializers.ModelSerializer):
 class ItineraryStopSerializer(serializers.ModelSerializer):
     place = PlaceListSerializer(read_only=True)
     place_id = serializers.PrimaryKeyRelatedField(
-        source="place", queryset=Place.objects.filter(status=Place.Status.PUBLISHED), write_only=True
+        source="place",
+        queryset=Place.objects.filter(status=Place.Status.PUBLISHED),
+        write_only=True,
     )
 
     class Meta:

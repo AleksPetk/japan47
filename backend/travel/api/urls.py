@@ -1,6 +1,12 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from .views.accounts import (
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    ResendVerificationView,
+    VerifyEmailView,
+)
 from .views.badges import BadgesView
 from .views.common import HealthView, HomeView, SearchView
 from .views.community import (
@@ -11,11 +17,11 @@ from .views.community import (
     ItineraryViewSet,
     VisitedPlaceViewSet,
 )
-from .views.destinations import PlaceViewSet, ReviewViewSet
+from .views.destinations import PlaceViewSet
 from .views.prefectures import PrefectureViewSet
 from .views.regions import RegionViewSet
+from .views.reviews import ReviewViewSet
 from .views.support import SupportTicketView
-from .views.accounts import PasswordResetConfirmView, PasswordResetRequestView, ResendVerificationView, VerifyEmailView
 from .views.users import (
     ContributorDetailView,
     CurrentProfileView,
@@ -52,10 +58,22 @@ urlpatterns = [
     path("auth/login/", ThrottledTokenObtainPairView.as_view(), name="token-obtain"),
     path("auth/refresh/", VerifiedTokenRefreshView.as_view(), name="token-refresh"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
-    path("auth/account/verify-password/", VerifyCurrentPasswordView.as_view(), name="verify-current-password"),
+    path(
+        "auth/account/verify-password/",
+        VerifyCurrentPasswordView.as_view(),
+        name="verify-current-password",
+    ),
     path("auth/account/delete/", DeleteAccountView.as_view(), name="delete-account"),
     path("auth/verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path("auth/resend-verification/", ResendVerificationView.as_view(), name="resend-verification"),
-    path("auth/password-reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),
-    path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    path(
+        "auth/password-reset/request/",
+        PasswordResetRequestView.as_view(),
+        name="password-reset-request",
+    ),
+    path(
+        "auth/password-reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="password-reset-confirm",
+    ),
 ]

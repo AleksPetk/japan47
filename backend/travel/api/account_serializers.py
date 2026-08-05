@@ -13,8 +13,11 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from travel.accounts.services import invalidate_user_refresh_tokens, normalize_email, normalize_username
+from travel.accounts.services import (
+    invalidate_user_refresh_tokens,
+    normalize_email,
+    normalize_username,
+)
 
 User = get_user_model()
 
@@ -30,8 +33,9 @@ class VerifiedTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         entered_username = (attrs.get(self.username_field) or "").strip()
         matching_usernames = list(
-            User.objects.filter(username__iexact=normalize_username(entered_username))
-            .values_list("username", flat=True)[:2]
+            User.objects.filter(username__iexact=normalize_username(entered_username)).values_list(
+                "username", flat=True
+            )[:2]
         )
         # Use the canonical stored spelling when the case-insensitive match is
         # unambiguous. Legacy mixed-case accounts therefore continue to work,
@@ -58,7 +62,9 @@ class VerifiedTokenRefreshSerializer(TokenRefreshSerializer):
         try:
             token = RefreshToken(attrs["refresh"])
             user_id = token[api_settings.USER_ID_CLAIM]
-            user = User.objects.select_related("profile").get(**{api_settings.USER_ID_FIELD: user_id})
+            user = User.objects.select_related("profile").get(
+                **{api_settings.USER_ID_FIELD: user_id}
+            )
         except (KeyError, User.DoesNotExist, TokenError):
             raise InvalidToken("Token is invalid or expired.")
         if not user.is_active or not user.profile.email_verified:
@@ -89,12 +95,14 @@ class PasswordVerificationSerializer(serializers.Serializer):
     def validate(self, attrs):
         user = self.context["request"].user
         if user.is_staff or user.is_superuser:
-            raise serializers.ValidationError({
-                "account": (
-                    "Staff or superuser privileges must first be removed "
-                    "by another authorized administrator."
-                )
-            })
+            raise serializers.ValidationError(
+                {
+                    "account": (
+                        "Staff or superuser privileges must first be removed "
+                        "by another authorized administrator."
+                    )
+                }
+            )
         return attrs
 
 
@@ -120,9 +128,13 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             user_id = force_str(urlsafe_base64_decode(attrs["uid"]))
             user = User.objects.get(pk=user_id, is_active=True)
         except (ValueError, TypeError, OverflowError, User.DoesNotExist):
-            raise serializers.ValidationError({"token": "This password-reset link is invalid or expired."})
+            raise serializers.ValidationError(
+                {"token": "This password-reset link is invalid or expired."}
+            )
         if not default_token_generator.check_token(user, attrs["token"]):
-            raise serializers.ValidationError({"token": "This password-reset link is invalid or expired."})
+            raise serializers.ValidationError(
+                {"token": "This password-reset link is invalid or expired."}
+            )
         try:
             validate_password(attrs["new_password"], user=user)
         except DjangoValidationError as exc:

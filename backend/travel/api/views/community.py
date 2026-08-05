@@ -7,8 +7,15 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-
-from travel.models import Collection, ContentReport, Favorite, Follow, Itinerary, ItineraryStop, Place, VisitedPlace
+from travel.models import (
+    Collection,
+    ContentReport,
+    Favorite,
+    Follow,
+    Itinerary,
+    Place,
+    VisitedPlace,
+)
 from travel.services import personalize_places
 
 from ..permissions import IsOwnerOrStaff
@@ -105,7 +112,15 @@ class ItineraryViewSet(viewsets.ModelViewSet):
     def add_stop(self, request, pk=None):
         itinerary = self.get_object()
         if itinerary.owner_id != request.user.id:
-            return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can edit this itinerary."}}, status=403)
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "permission_denied",
+                        "message": "Only the owner can edit this itinerary.",
+                    }
+                },
+                status=403,
+            )
         serializer = ItineraryStopSerializer(
             data=request.data, context={"request": request, "itinerary": itinerary}
         )
@@ -124,7 +139,9 @@ class ContentReportViewSet(viewsets.ModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return self.queryset
         queryset = ContentReport.objects.select_related("reporter", "place", "review")
-        return queryset if self.request.user.is_staff else queryset.filter(reporter=self.request.user)
+        return (
+            queryset if self.request.user.is_staff else queryset.filter(reporter=self.request.user)
+        )
 
     def perform_create(self, serializer):
         serializer.save(reporter=self.request.user)
@@ -134,12 +151,17 @@ class FollowViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = User.objects.none()
 
-    @extend_schema(request=None, responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT, 204: None})
+    @extend_schema(
+        request=None, responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT, 204: None}
+    )
     @action(detail=True, methods=("post", "delete"))
     def follow(self, request, pk=None):
         target = get_object_or_404(User, pk=pk, is_active=True)
         if target == request.user:
-            return JsonResponse({"error": {"code": "validation_error", "message": "You cannot follow yourself."}}, status=400)
+            return JsonResponse(
+                {"error": {"code": "validation_error", "message": "You cannot follow yourself."}},
+                status=400,
+            )
         if request.method == "DELETE":
             Follow.objects.filter(follower=request.user, following=target).delete()
             return JsonResponse({}, status=204)

@@ -1,17 +1,25 @@
+from config.settings.base import normalized_admin_path
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
-from django.test import TestCase
 from django.templatetags.static import static
+from django.test import TestCase
 from django.urls import reverse
 from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import totp
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
-
-from travel.models import ContentReport, Place, PlaceDeletionRequest, PlaceRevision, Prefecture, Region, Review, SupportTicket
-from config.settings.base import normalized_admin_path
+from travel.models import (
+    ContentReport,
+    Place,
+    PlaceDeletionRequest,
+    PlaceRevision,
+    Prefecture,
+    Region,
+    Review,
+    SupportTicket,
+)
 
 User = get_user_model()
 
@@ -19,10 +27,16 @@ User = get_user_model()
 class AdminFixture(TestCase):
     def setUp(self):
         self.password = "StrongPass123!"
-        self.staff = User.objects.create_superuser("admin-owner", "owner@example.com", self.password)
-        self.author = User.objects.create_user("author-admin-test", "author-admin@example.com", self.password)
+        self.staff = User.objects.create_superuser(
+            "admin-owner", "owner@example.com", self.password
+        )
+        self.author = User.objects.create_user(
+            "author-admin-test", "author-admin@example.com", self.password
+        )
         self.region = Region.objects.create(name=Region.RegionName.KANTO, display_order=1)
-        self.prefecture = Prefecture.objects.create(region=self.region, name="Tokyo", display_order=1)
+        self.prefecture = Prefecture.objects.create(
+            region=self.region, name="Tokyo", display_order=1
+        )
         self.place = Place.objects.create(
             author=self.author,
             prefecture=self.prefecture,
@@ -41,7 +55,9 @@ class AdminFixture(TestCase):
 
     @staticmethod
     def current_token(device):
-        return str(totp(device.bin_key, device.step, device.t0, device.digits, device.drift)).zfill(device.digits)
+        return str(totp(device.bin_key, device.step, device.t0, device.digits, device.drift)).zfill(
+            device.digits
+        )
 
     def support_ticket(self, status=SupportTicket.Status.NEW):
         return SupportTicket.objects.create(
@@ -91,11 +107,14 @@ class PrivateAdminAndTwoFactorTests(AdminFixture):
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 302)
 
     def test_password_login_leads_to_mandatory_enrollment(self):
-        response = self.client.post(reverse("admin:login"), {
-            "username": self.staff.username,
-            "password": self.password,
-            "next": reverse("admin:index"),
-        })
+        response = self.client.post(
+            reverse("admin:login"),
+            {
+                "username": self.staff.username,
+                "password": self.password,
+                "next": reverse("admin:index"),
+            },
+        )
         self.assertRedirects(response, reverse("admin:index"), fetch_redirect_response=False)
         self.assertRedirects(
             self.client.get(reverse("admin:index")),
@@ -114,7 +133,11 @@ class PrivateAdminAndTwoFactorTests(AdminFixture):
     def test_staff_without_device_is_forced_to_setup(self):
         self.client.force_login(self.staff)
         response = self.client.get(reverse("admin:index"))
-        self.assertRedirects(response, f"{reverse('admin-2fa-setup')}?next=/{settings.ADMIN_PATH}", fetch_redirect_response=False)
+        self.assertRedirects(
+            response,
+            f"{reverse('admin-2fa-setup')}?next=/{settings.ADMIN_PATH}",
+            fetch_redirect_response=False,
+        )
 
     def test_setup_requires_valid_code_and_shows_recovery_codes_once(self):
         self.client.force_login(self.staff)
@@ -130,26 +153,36 @@ class PrivateAdminAndTwoFactorTests(AdminFixture):
         self.assertFalse(device.confirmed)
         device.throttle_reset()
 
-        success = self.client.post(reverse("admin-2fa-setup"), {"token": self.current_token(device)}, follow=True)
+        success = self.client.post(
+            reverse("admin-2fa-setup"), {"token": self.current_token(device)}, follow=True
+        )
         self.assertEqual(success.status_code, 200)
         device.refresh_from_db()
         self.assertTrue(device.confirmed)
         self.assertContains(success, "These codes are shown once")
         self.assertEqual(StaticToken.objects.filter(device__user=self.staff).count(), 10)
-        self.assertNotContains(self.client.get(reverse("admin-2fa-codes")), "These codes are shown once")
+        self.assertNotContains(
+            self.client.get(reverse("admin-2fa-codes")), "These codes are shown once"
+        )
 
     def test_enrolled_staff_must_verify_totp_each_session(self):
-        device = TOTPDevice.objects.create(user=self.staff, name="Google Authenticator", confirmed=True)
+        device = TOTPDevice.objects.create(
+            user=self.staff, name="Google Authenticator", confirmed=True
+        )
         self.client.force_login(self.staff)
         self.assertRedirects(
             self.client.get(reverse("admin:index")),
             f"{reverse('admin-2fa-verify')}?next=/{settings.ADMIN_PATH}",
             fetch_redirect_response=False,
         )
-        self.assertContains(self.client.post(reverse("admin-2fa-verify"), {"token": "000000"}), "invalid or expired")
+        self.assertContains(
+            self.client.post(reverse("admin-2fa-verify"), {"token": "000000"}), "invalid or expired"
+        )
         device.refresh_from_db()
         device.throttle_reset()
-        response = self.client.post(reverse("admin-2fa-verify"), {"token": self.current_token(device)})
+        response = self.client.post(
+            reverse("admin-2fa-verify"), {"token": self.current_token(device)}
+        )
         self.assertRedirects(response, reverse("admin:index"), fetch_redirect_response=False)
         self.assertEqual(self.client.get(reverse("admin:index")).status_code, 200)
 
@@ -186,8 +219,12 @@ class AdminAlertAndModerationTests(AdminFixture):
 
     def test_dashboard_and_sidebar_alerts_follow_workflow_status(self):
         ticket = self.support_ticket()
-        review = Review.objects.create(place=self.place, author=self.author, rating=4, comment="Reported review")
-        report = ContentReport.objects.create(reporter=self.author, review=review, reason="Please inspect")
+        review = Review.objects.create(
+            place=self.place, author=self.author, rating=4, comment="Reported review"
+        )
+        report = ContentReport.objects.create(
+            reporter=self.author, review=review, reason="Please inspect"
+        )
         response = self.client.get(reverse("admin:index"))
         self.assertContains(response, "Needs Your Attention")
         self.assertContains(response, "Pending Places")
@@ -196,7 +233,12 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertContains(response, "?status__exact=pending")
         self.assertContains(response, "?status__exact=new")
         self.assertContains(response, "?status__exact=open")
-        self.assertEqual(self.client.get(f'{reverse("admin:travel_contentreport_changelist")}?status__exact=open&target=review').status_code, 200)
+        self.assertEqual(
+            self.client.get(
+                f'{reverse("admin:travel_contentreport_changelist")}?status__exact=open&target=review'
+            ).status_code,
+            200,
+        )
         self.assertContains(response, "j47-needs-attention", count=3)
 
         self.client.get(reverse("admin:travel_place_change", args=(self.place.pk,)))
@@ -204,15 +246,27 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertEqual(self.place.status, Place.Status.PENDING)
         self.assertContains(self.client.get(reverse("admin:index")), "j47-needs-attention")
 
-        self.client.post(reverse("admin:travel_place_changelist"), {
-            "action": "approve_places", "_selected_action": [self.place.pk],
-        })
-        self.client.post(reverse("admin:travel_supportticket_changelist"), {
-            "action": "mark_in_progress", "_selected_action": [ticket.pk],
-        })
-        self.client.post(reverse("admin:travel_contentreport_changelist"), {
-            "action": "resolve_reports", "_selected_action": [report.pk],
-        })
+        self.client.post(
+            reverse("admin:travel_place_changelist"),
+            {
+                "action": "approve_places",
+                "_selected_action": [self.place.pk],
+            },
+        )
+        self.client.post(
+            reverse("admin:travel_supportticket_changelist"),
+            {
+                "action": "mark_in_progress",
+                "_selected_action": [ticket.pk],
+            },
+        )
+        self.client.post(
+            reverse("admin:travel_contentreport_changelist"),
+            {
+                "action": "resolve_reports",
+                "_selected_action": [report.pk],
+            },
+        )
         response = self.client.get(reverse("admin:index"))
         self.assertNotContains(response, "j47-needs-attention")
 
@@ -220,7 +274,12 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.place.status = Place.Status.REJECTED
         self.place.save(update_fields=("status",))
         self.support_ticket(SupportTicket.Status.IN_PROGRESS)
-        ContentReport.objects.create(reporter=self.author, place=self.place, reason="Done", status=ContentReport.Status.DISMISSED)
+        ContentReport.objects.create(
+            reporter=self.author,
+            place=self.place,
+            reason="Done",
+            status=ContentReport.Status.DISMISSED,
+        )
         self.assertNotContains(self.client.get(reverse("admin:index")), "j47-needs-attention")
 
     def test_place_approve_and_reject_actions_record_audit_identity(self):
@@ -276,14 +335,17 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertContains(response, "Approve Changes")
         self.assertContains(response, "Reject Changes")
 
-        response = self.client.post(url, {
-            "review_note": "The proposed details are accurate.",
-            "_approve_revision": "1",
-            "gallery_images-TOTAL_FORMS": "0",
-            "gallery_images-INITIAL_FORMS": "0",
-            "gallery_images-MIN_NUM_FORMS": "0",
-            "gallery_images-MAX_NUM_FORMS": "1000",
-        })
+        response = self.client.post(
+            url,
+            {
+                "review_note": "The proposed details are accurate.",
+                "_approve_revision": "1",
+                "gallery_images-TOTAL_FORMS": "0",
+                "gallery_images-INITIAL_FORMS": "0",
+                "gallery_images-MIN_NUM_FORMS": "0",
+                "gallery_images-MAX_NUM_FORMS": "1000",
+            },
+        )
         self.assertRedirects(response, url, fetch_redirect_response=False)
         revision.refresh_from_db()
         self.place.refresh_from_db()
@@ -298,14 +360,17 @@ class AdminAlertAndModerationTests(AdminFixture):
         revision = self.place_revision()
         original_name = self.place.name
         url = reverse("admin:travel_placerevision_change", args=(revision.pk,))
-        response = self.client.post(url, {
-            "review_note": "This change is not suitable.",
-            "_reject_revision": "1",
-            "gallery_images-TOTAL_FORMS": "0",
-            "gallery_images-INITIAL_FORMS": "0",
-            "gallery_images-MIN_NUM_FORMS": "0",
-            "gallery_images-MAX_NUM_FORMS": "1000",
-        })
+        response = self.client.post(
+            url,
+            {
+                "review_note": "This change is not suitable.",
+                "_reject_revision": "1",
+                "gallery_images-TOTAL_FORMS": "0",
+                "gallery_images-INITIAL_FORMS": "0",
+                "gallery_images-MIN_NUM_FORMS": "0",
+                "gallery_images-MAX_NUM_FORMS": "1000",
+            },
+        )
         self.assertRedirects(response, url, fetch_redirect_response=False)
         revision.refresh_from_db()
         self.place.refresh_from_db()
@@ -339,10 +404,13 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertContains(detail, "Reject Request")
         self.assertContains(detail, deletion_request.reason)
 
-        rejected = self.client.post(url, {
-            "admin_note": "The place remains useful to the community.",
-            "_reject_deletion": "1",
-        })
+        rejected = self.client.post(
+            url,
+            {
+                "admin_note": "The place remains useful to the community.",
+                "_reject_deletion": "1",
+            },
+        )
         self.assertRedirects(rejected, url, fetch_redirect_response=False)
         deletion_request.refresh_from_db()
         self.assertEqual(deletion_request.status, PlaceDeletionRequest.Status.REJECTED)
@@ -359,10 +427,13 @@ class AdminAlertAndModerationTests(AdminFixture):
         )
         place_id = self.place.pk
         url = reverse("admin:travel_placedeletionrequest_change", args=(deletion_request.pk,))
-        response = self.client.post(url, {
-            "admin_note": "Confirmed duplicate.",
-            "_approve_deletion": "1",
-        })
+        response = self.client.post(
+            url,
+            {
+                "admin_note": "Confirmed duplicate.",
+                "_approve_deletion": "1",
+            },
+        )
         self.assertRedirects(response, url, fetch_redirect_response=False)
         self.assertFalse(Place.objects.filter(pk=place_id).exists())
         deletion_request.refresh_from_db()
@@ -374,7 +445,9 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertNotContains(completed, "Approve Deletion")
 
     def test_report_resolve_and_dismiss_actions_record_audit_identity(self):
-        report = ContentReport.objects.create(reporter=self.author, place=self.place, reason="Review")
+        report = ContentReport.objects.create(
+            reporter=self.author, place=self.place, reason="Review"
+        )
         report_admin = admin.site._registry[ContentReport]
         request = type("Request", (), {"user": self.staff})()
         report_admin.message_user = lambda *args, **kwargs: None
@@ -398,7 +471,9 @@ class AdminAlertAndModerationTests(AdminFixture):
         self.assertEqual(self.place.reviewed_by, self.staff)
         self.assertIsNotNone(self.place.reviewed_at)
 
-        report = ContentReport.objects.create(reporter=self.author, place=self.place, reason="Manual review")
+        report = ContentReport.objects.create(
+            reporter=self.author, place=self.place, reason="Manual review"
+        )
         report.status = ContentReport.Status.RESOLVED
         admin.site._registry[ContentReport].save_model(request, report, changed_status_form, True)
         report.refresh_from_db()

@@ -3,11 +3,10 @@
 import secrets
 
 from django.conf import settings
-from django.core import signing
 from django.contrib.auth import get_user_model
+from django.core import signing
 from django.db import transaction
 from django.utils import timezone
-
 from travel.models import Profile
 
 User = get_user_model()
@@ -45,7 +44,9 @@ def consume_email_verification_token(token):
 
     with transaction.atomic():
         try:
-            profile = Profile.objects.select_for_update().select_related("user").get(user_id=user_id)
+            profile = (
+                Profile.objects.select_for_update().select_related("user").get(user_id=user_id)
+            )
         except Profile.DoesNotExist:
             return "invalid"
         if profile.email_verified:
@@ -58,8 +59,14 @@ def consume_email_verification_token(token):
         profile.email_verified_at = timezone.now()
         # Rotating the nonce makes every previously issued link unusable.
         import uuid
+
         profile.email_verification_nonce = uuid.uuid4()
-        profile.save(update_fields=(
-            "email_verified", "email_verified_at", "email_verification_nonce", "updated_at",
-        ))
+        profile.save(
+            update_fields=(
+                "email_verified",
+                "email_verified_at",
+                "email_verification_nonce",
+                "updated_at",
+            )
+        )
     return "success"

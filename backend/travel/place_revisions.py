@@ -41,7 +41,9 @@ def approve_place_revision(revision, reviewer):
         raise ValidationError("Only pending place revisions can be approved.")
 
     removed_gallery = list(revision.removed_gallery_images.filter(place=place))
-    final_gallery_count = place.gallery_images.count() - len(removed_gallery) + revision.gallery_images.count()
+    final_gallery_count = (
+        place.gallery_images.count() - len(removed_gallery) + revision.gallery_images.count()
+    )
     if final_gallery_count > MAX_PLACE_GALLERY_IMAGES:
         raise ValidationError(f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos.")
 
@@ -71,7 +73,9 @@ def approve_place_revision(revision, reviewer):
     for gallery_image in removed_gallery:
         gallery_image.delete()
 
-    next_order = (place.gallery_images.aggregate(max_order=Max("display_order"))["max_order"] or -1) + 1
+    next_order = (
+        place.gallery_images.aggregate(max_order=Max("display_order"))["max_order"] or -1
+    ) + 1
     for offset, proposed_image in enumerate(revision.gallery_images.all()):
         PlaceImage.objects.create(
             place=place,

@@ -3,9 +3,9 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
-from django.urls import reverse
 
 from .models import (
     Collection,
@@ -26,8 +26,8 @@ from .models import (
     SupportTicket,
     VisitedPlace,
 )
-from .place_revisions import approve_place_revision, reject_place_revision
 from .place_deletions import approve_place_deletion, reject_place_deletion
+from .place_revisions import approve_place_revision, reject_place_revision
 
 
 def image_preview(image, *, large=False):
@@ -61,6 +61,7 @@ class ReportTargetFilter(admin.SimpleListFilter):
             return queryset.filter(place__isnull=False)
         return queryset
 
+
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
     list_display = ("display_order", "name")
@@ -68,14 +69,15 @@ class RegionAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return Region.objects.count() < 9
-    
-    def has_delete_permission(self, request, obj = None):
+
+    def has_delete_permission(self, request, obj=None):
         return False
-    
-    def get_readonly_fields(self, request, obj = None):
+
+    def get_readonly_fields(self, request, obj=None):
         if obj:
             return ("name",)
         return ()
+
 
 @admin.register(Prefecture)
 class PrefectureAdmin(admin.ModelAdmin):
@@ -86,11 +88,11 @@ class PrefectureAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return Prefecture.objects.count() < 47
-    
-    def has_delete_permission(self, request, obj = None):
+
+    def has_delete_permission(self, request, obj=None):
         return False
-    
-    def get_readonly_fields(self, request, obj = None):
+
+    def get_readonly_fields(self, request, obj=None):
         if obj:
             return ("name",)
         return ()
@@ -98,11 +100,35 @@ class PrefectureAdmin(admin.ModelAdmin):
 
 @admin.register(Place)
 class PlaceAdmin(admin.ModelAdmin):
-    list_display = ("image_thumbnail", "name", "prefecture", "author", "is_platform_managed", "status_display", "pending_changes", "reviewed_by", "reviewed_at", "updated_at")
-    list_filter = ("status", "is_platform_managed", "prefecture__region", "prefecture", "reviewed_at")
+    list_display = (
+        "image_thumbnail",
+        "name",
+        "prefecture",
+        "author",
+        "is_platform_managed",
+        "status_display",
+        "pending_changes",
+        "reviewed_by",
+        "reviewed_at",
+        "updated_at",
+    )
+    list_filter = (
+        "status",
+        "is_platform_managed",
+        "prefecture__region",
+        "prefecture",
+        "reviewed_at",
+    )
     search_fields = ("name", "city", "author__username", "prefecture__name")
     prepopulated_fields = {"slug": ("name",)}
-    readonly_fields = ("image_large_preview", "is_platform_managed", "reviewed_by", "reviewed_at", "created_at", "updated_at")
+    readonly_fields = (
+        "image_large_preview",
+        "is_platform_managed",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+        "updated_at",
+    )
     ordering = ("-created_at",)
     actions = ("approve_places", "reject_places")
     list_select_related = ("author", "prefecture", "reviewed_by")
@@ -127,10 +153,14 @@ class PlaceAdmin(admin.ModelAdmin):
         return format_html('<a href="{}?place__id__exact={}">Review changes</a>', url, obj.pk)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
-            pending_revision_count=Count(
-                "revisions",
-                filter=Q(revisions__status=PlaceRevision.Status.PENDING),
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                pending_revision_count=Count(
+                    "revisions",
+                    filter=Q(revisions__status=PlaceRevision.Status.PENDING),
+                )
             )
         )
 
@@ -179,7 +209,14 @@ class PlaceRevisionImageInline(admin.TabularInline):
 class PlaceRevisionAdmin(admin.ModelAdmin):
     """Compare and moderate proposed edits without exposing the live row to writes."""
 
-    list_display = ("place", "submitted_by", "status_display", "updated_at", "reviewed_by", "reviewed_at")
+    list_display = (
+        "place",
+        "submitted_by",
+        "status_display",
+        "updated_at",
+        "reviewed_by",
+        "reviewed_at",
+    )
     list_filter = ("status", "prefecture__region", "prefecture", "updated_at")
     search_fields = ("place__name", "name", "submitted_by__username", "prefecture__name")
     list_select_related = ("place", "submitted_by", "prefecture", "reviewed_by")
@@ -188,18 +225,51 @@ class PlaceRevisionAdmin(admin.ModelAdmin):
     change_form_template = "admin/travel/placerevision/change_form.html"
     inlines = (PlaceRevisionImageInline,)
     readonly_fields = (
-        "place", "submitted_by", "status", "comparison", "prefecture", "name",
-        "description", "image_large_preview", "gallery_removals", "city", "google_maps_url",
-        "official_website", "travel_tips", "best_season", "latitude", "longitude",
-        "reviewed_by", "reviewed_at", "created_at", "updated_at",
+        "place",
+        "submitted_by",
+        "status",
+        "comparison",
+        "prefecture",
+        "name",
+        "description",
+        "image_large_preview",
+        "gallery_removals",
+        "city",
+        "google_maps_url",
+        "official_website",
+        "travel_tips",
+        "best_season",
+        "latitude",
+        "longitude",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+        "updated_at",
     )
     fieldsets = (
-        ("Moderation", {"fields": ("place", "submitted_by", "status", "comparison", "review_note")}),
-        ("Proposed values", {"fields": (
-            "prefecture", "name", "description", "image_large_preview", "gallery_removals", "city",
-            "google_maps_url", "official_website", "travel_tips", "best_season",
-            "latitude", "longitude",
-        )}),
+        (
+            "Moderation",
+            {"fields": ("place", "submitted_by", "status", "comparison", "review_note")},
+        ),
+        (
+            "Proposed values",
+            {
+                "fields": (
+                    "prefecture",
+                    "name",
+                    "description",
+                    "image_large_preview",
+                    "gallery_removals",
+                    "city",
+                    "google_maps_url",
+                    "official_website",
+                    "travel_tips",
+                    "best_season",
+                    "latitude",
+                    "longitude",
+                )
+            },
+        ),
         ("Audit", {"fields": ("reviewed_by", "reviewed_at", "created_at", "updated_at")}),
     )
 
@@ -216,29 +286,39 @@ class PlaceRevisionAdmin(admin.ModelAdmin):
     @admin.display(description="Published gallery removals")
     def gallery_removals(self, obj):
         names = [image.caption or image.image.name for image in obj.removed_gallery_images.all()]
-        return format_html("<br>".join("{}" for _ in names), *names) if names else "No gallery removals"
+        return (
+            format_html("<br>".join("{}" for _ in names), *names)
+            if names
+            else "No gallery removals"
+        )
 
     @admin.display(description="Published versus proposed")
     def comparison(self, obj):
         rows = []
         for field, label in (
-            ("prefecture", "Prefecture"), ("name", "Name"),
-            ("description", "Description"), ("city", "City"),
+            ("prefecture", "Prefecture"),
+            ("name", "Name"),
+            ("description", "Description"),
+            ("city", "City"),
             ("google_maps_url", "Google Maps URL"),
             ("official_website", "Official website"),
-            ("travel_tips", "Travel tips"), ("best_season", "Best season"),
-            ("latitude", "Latitude"), ("longitude", "Longitude"),
+            ("travel_tips", "Travel tips"),
+            ("best_season", "Best season"),
+            ("latitude", "Latitude"),
+            ("longitude", "Longitude"),
         ):
             current = getattr(obj.place, field)
             proposed = getattr(obj, field)
             changed = current != proposed
-            rows.append(format_html(
-                '<tr{}><th>{}</th><td>{}</td><td>{}</td></tr>',
-                ' class="j47-revision-changed"' if changed else "",
-                label,
-                current if current not in (None, "") else "—",
-                proposed if proposed not in (None, "") else "—",
-            ))
+            rows.append(
+                format_html(
+                    "<tr{}><th>{}</th><td>{}</td><td>{}</td></tr>",
+                    ' class="j47-revision-changed"' if changed else "",
+                    label,
+                    current if current not in (None, "") else "—",
+                    proposed if proposed not in (None, "") else "—",
+                )
+            )
         return format_html(
             '<table class="j47-revision-table"><thead><tr><th>Field</th><th>Published</th><th>Proposed</th></tr></thead><tbody>{}</tbody></table>',
             format_html_join("", "{}", ((row,) for row in rows)),
@@ -272,18 +352,28 @@ class PlaceRevisionAdmin(admin.ModelAdmin):
         change_url = reverse("admin:travel_placerevision_change", args=(obj.pk,))
         if "_approve_revision" in request.POST:
             if obj.status != PlaceRevision.Status.PENDING:
-                self.message_user(request, "This place edit has already been reviewed.", messages.WARNING)
+                self.message_user(
+                    request, "This place edit has already been reviewed.", messages.WARNING
+                )
             else:
                 approve_place_revision(obj, request.user)
-                self.message_user(request, "The proposed place changes were approved and published.", messages.SUCCESS)
+                self.message_user(
+                    request,
+                    "The proposed place changes were approved and published.",
+                    messages.SUCCESS,
+                )
             return HttpResponseRedirect(change_url)
 
         if "_reject_revision" in request.POST:
             if obj.status != PlaceRevision.Status.PENDING:
-                self.message_user(request, "This place edit has already been reviewed.", messages.WARNING)
+                self.message_user(
+                    request, "This place edit has already been reviewed.", messages.WARNING
+                )
             else:
                 reject_place_revision(obj, request.user)
-                self.message_user(request, "The proposed place changes were rejected.", messages.WARNING)
+                self.message_user(
+                    request, "The proposed place changes were rejected.", messages.WARNING
+                )
             return HttpResponseRedirect(change_url)
 
         return super().response_change(request, obj)
@@ -300,8 +390,12 @@ class PlaceDeletionRequestAdmin(admin.ModelAdmin):
     """Review owner requests without allowing the workflow state to be forged."""
 
     list_display = (
-        "place_name", "requested_by", "status_display", "created_at",
-        "reviewed_by", "reviewed_at",
+        "place_name",
+        "requested_by",
+        "status_display",
+        "created_at",
+        "reviewed_by",
+        "reviewed_at",
     )
     list_filter = ("status", "created_at", "reviewed_at")
     search_fields = ("place_name", "requested_by__username", "reason")
@@ -310,11 +404,21 @@ class PlaceDeletionRequestAdmin(admin.ModelAdmin):
     actions = ("approve_deletions", "reject_deletions")
     change_form_template = "admin/travel/placedeletionrequest/change_form.html"
     readonly_fields = (
-        "place_link", "place_name", "requested_by", "reason", "status",
-        "reviewed_by", "reviewed_at", "created_at", "updated_at",
+        "place_link",
+        "place_name",
+        "requested_by",
+        "reason",
+        "status",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+        "updated_at",
     )
     fieldsets = (
-        ("Deletion request", {"fields": ("place_link", "place_name", "requested_by", "reason", "status")}),
+        (
+            "Deletion request",
+            {"fields": ("place_link", "place_name", "requested_by", "reason", "status")},
+        ),
         ("Administrator decision", {"fields": ("admin_note",)}),
         ("Audit", {"fields": ("reviewed_by", "reviewed_at", "created_at", "updated_at")}),
     )
@@ -360,18 +464,30 @@ class PlaceDeletionRequestAdmin(admin.ModelAdmin):
         change_url = reverse("admin:travel_placedeletionrequest_change", args=(obj.pk,))
         if "_approve_deletion" in request.POST:
             if obj.status != PlaceDeletionRequest.Status.PENDING:
-                self.message_user(request, "This deletion request has already been reviewed.", messages.WARNING)
+                self.message_user(
+                    request, "This deletion request has already been reviewed.", messages.WARNING
+                )
             else:
                 approve_place_deletion(obj, request.user)
-                self.message_user(request, "The deletion was approved and the place was permanently deleted.", messages.SUCCESS)
+                self.message_user(
+                    request,
+                    "The deletion was approved and the place was permanently deleted.",
+                    messages.SUCCESS,
+                )
             return HttpResponseRedirect(change_url)
 
         if "_reject_deletion" in request.POST:
             if obj.status != PlaceDeletionRequest.Status.PENDING:
-                self.message_user(request, "This deletion request has already been reviewed.", messages.WARNING)
+                self.message_user(
+                    request, "This deletion request has already been reviewed.", messages.WARNING
+                )
             else:
                 reject_place_deletion(obj, request.user)
-                self.message_user(request, "The deletion request was rejected; the place remains available.", messages.WARNING)
+                self.message_user(
+                    request,
+                    "The deletion request was rejected; the place remains available.",
+                    messages.WARNING,
+                )
             return HttpResponseRedirect(change_url)
 
         return super().response_change(request, obj)
@@ -394,12 +510,23 @@ class ReviewAdmin(admin.ModelAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("avatar_thumbnail", "user", "nickname", "email_verified", "email_verified_at", "created_at", "updated_at")
+    list_display = (
+        "avatar_thumbnail",
+        "user",
+        "nickname",
+        "email_verified",
+        "email_verified_at",
+        "created_at",
+        "updated_at",
+    )
     list_filter = ("email_verified", "created_at")
     search_fields = ("user__username", "user__email", "nickname")
     readonly_fields = (
-        "email_verified_at", "email_verification_sent_at",
-        "password_reset_sent_at", "created_at", "updated_at",
+        "email_verified_at",
+        "email_verification_sent_at",
+        "password_reset_sent_at",
+        "created_at",
+        "updated_at",
     )
     list_select_related = ("user",)
 
@@ -425,10 +552,21 @@ class Japan47UserAdmin(UserAdmin):
 
     inlines = (AccountProfileInline,)
     list_display = (
-        "username", "email", "email_is_verified", "is_active",
-        "is_staff", "date_joined", "last_login",
+        "username",
+        "email",
+        "email_is_verified",
+        "is_active",
+        "is_staff",
+        "date_joined",
+        "last_login",
     )
-    list_filter = ("profile__email_verified", "is_active", "is_staff", "is_superuser", "date_joined")
+    list_filter = (
+        "profile__email_verified",
+        "is_active",
+        "is_staff",
+        "is_superuser",
+        "date_joined",
+    )
     search_fields = ("username", "email", "profile__nickname")
     list_select_related = ("profile",)
 
@@ -439,10 +577,28 @@ class Japan47UserAdmin(UserAdmin):
 
 @admin.register(ContentReport)
 class ContentReportAdmin(admin.ModelAdmin):
-    list_display = ("id", "target_type", "target_link", "reporter_display", "status_display", "resolved_by", "resolved_at", "created_at")
+    list_display = (
+        "id",
+        "target_type",
+        "target_link",
+        "reporter_display",
+        "status_display",
+        "resolved_by",
+        "resolved_at",
+        "created_at",
+    )
     list_filter = ("status", ReportTargetFilter, "created_at")
     list_select_related = ("reporter", "place", "review", "resolved_by")
-    readonly_fields = ("reporter_display", "place", "review", "target_link", "reason", "created_at", "resolved_at", "resolved_by")
+    readonly_fields = (
+        "reporter_display",
+        "place",
+        "review",
+        "target_link",
+        "reason",
+        "created_at",
+        "resolved_at",
+        "resolved_by",
+    )
     search_fields = ("reporter__username", "place__name", "review__comment", "reason")
     actions = ("resolve_reports", "dismiss_reports")
 
@@ -526,27 +682,62 @@ class SupportTicketAdmin(admin.ModelAdmin):
     """Keep customer input immutable while staff manage the ticket lifecycle."""
 
     list_display = (
-        "ticket_id", "status_display", "category", "user_display", "registered_email",
-        "contact_email_link", "subject", "ticket_age", "created_at", "updated_at",
+        "ticket_id",
+        "status_display",
+        "category",
+        "user_display",
+        "registered_email",
+        "contact_email_link",
+        "subject",
+        "ticket_age",
+        "created_at",
+        "updated_at",
     )
     list_filter = ("status", "category", "created_at", "updated_at")
     search_fields = (
-        "ticket_id", "subject", "message", "user__username",
-        "registered_email", "contact_email",
+        "ticket_id",
+        "subject",
+        "message",
+        "user__username",
+        "registered_email",
+        "contact_email",
     )
     list_select_related = ("user", "assigned_administrator")
     ordering = ("-created_at",)
     date_hierarchy = "created_at"
     readonly_fields = (
-        "ticket_id", "user_display", "registered_email", "contact_email",
-        "contact_email_link", "category", "subject", "related_url",
-        "screenshot", "screenshot_preview", "message", "created_at", "updated_at",
+        "ticket_id",
+        "user_display",
+        "registered_email",
+        "contact_email",
+        "contact_email_link",
+        "category",
+        "subject",
+        "related_url",
+        "screenshot",
+        "screenshot_preview",
+        "message",
+        "created_at",
+        "updated_at",
     )
     fieldsets = (
-        ("Request", {"fields": (
-            "ticket_id", "user_display", "registered_email", "contact_email_link",
-            "category", "subject", "related_url", "screenshot", "screenshot_preview", "message",
-        )}),
+        (
+            "Request",
+            {
+                "fields": (
+                    "ticket_id",
+                    "user_display",
+                    "registered_email",
+                    "contact_email_link",
+                    "category",
+                    "subject",
+                    "related_url",
+                    "screenshot",
+                    "screenshot_preview",
+                    "message",
+                )
+            },
+        ),
         ("Admin workflow", {"fields": ("status", "assigned_administrator", "internal_notes")}),
         ("Audit", {"fields": ("created_at", "updated_at")}),
     )
@@ -596,6 +787,7 @@ class SupportTicketAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
 
 admin.site.site_header = "Japan 47 administration"
 admin.site.site_title = "Japan 47 admin"

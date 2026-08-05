@@ -1,27 +1,28 @@
 import uuid
 
-from django.db import models
-from pillow_heif import register_heif_opener
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator, MaxValueValidator, MinValueValidator
-from django.contrib.auth.models import User
+from django.db import models
+from pillow_heif import register_heif_opener
 
-from .validators import validate_image_safety, validate_image_size, validate_support_screenshot_size
+from .services import generate_gallery_thumbnail, process_model_image, process_profile_image
 from .utils import (
-    place_image_upload_path,
     place_gallery_upload_path,
-    place_thumbnail_upload_path,
+    place_image_upload_path,
     place_revision_gallery_upload_path,
     place_revision_image_upload_path,
     place_revision_thumbnail_upload_path,
+    place_thumbnail_upload_path,
     prefecture_image_upload_path,
     profile_image_upload_path,
     region_image_upload_path,
     support_screenshot_upload_path,
 )
-from .services import generate_gallery_thumbnail, process_model_image, process_profile_image
+from .validators import validate_image_safety, validate_image_size, validate_support_screenshot_size
 
 register_heif_opener()
+
 
 class Region(models.Model):
     """Japan Regions Model."""
@@ -50,7 +51,7 @@ class Region(models.Model):
         blank=True,
         null=True,
         verbose_name="Region Image",
-        validators=[validate_image_size, validate_image_safety]
+        validators=[validate_image_size, validate_image_safety],
     )
     display_order = models.PositiveSmallIntegerField(unique=True)
 
@@ -59,7 +60,7 @@ class Region(models.Model):
 
     def __str__(self):
         return self.get_name_display()
-    
+
     def save(self, *args, **kwargs):
         """Save the model, clean replaced image, and process the new image."""
 
@@ -92,14 +93,12 @@ class Region(models.Model):
 class Prefecture(models.Model):
     PREFECTURE_REGION = {
         "Hokkaido": "Hokkaido",
-
         "Aomori": "Tohoku",
         "Iwate": "Tohoku",
         "Miyagi": "Tohoku",
         "Akita": "Tohoku",
         "Yamagata": "Tohoku",
         "Fukushima": "Tohoku",
-
         "Ibaraki": "Kanto",
         "Tochigi": "Kanto",
         "Gunma": "Kanto",
@@ -107,7 +106,6 @@ class Prefecture(models.Model):
         "Chiba": "Kanto",
         "Tokyo": "Kanto",
         "Kanagawa": "Kanto",
-
         "Niigata": "Chubu",
         "Toyama": "Chubu",
         "Ishikawa": "Chubu",
@@ -117,7 +115,6 @@ class Prefecture(models.Model):
         "Gifu": "Chubu",
         "Shizuoka": "Chubu",
         "Aichi": "Chubu",
-
         "Mie": "Kansai",
         "Shiga": "Kansai",
         "Kyoto": "Kansai",
@@ -125,18 +122,15 @@ class Prefecture(models.Model):
         "Hyogo": "Kansai",
         "Nara": "Kansai",
         "Wakayama": "Kansai",
-
         "Tottori": "Chugoku",
         "Shimane": "Chugoku",
         "Okayama": "Chugoku",
         "Hiroshima": "Chugoku",
         "Yamaguchi": "Chugoku",
-
         "Tokushima": "Shikoku",
         "Kagawa": "Shikoku",
         "Ehime": "Shikoku",
         "Kochi": "Shikoku",
-
         "Fukuoka": "Kyushu",
         "Saga": "Kyushu",
         "Nagasaki": "Kyushu",
@@ -144,7 +138,6 @@ class Prefecture(models.Model):
         "Oita": "Kyushu",
         "Miyazaki": "Kyushu",
         "Kagoshima": "Kyushu",
-
         "Okinawa": "Okinawa",
     }
 
@@ -183,18 +176,11 @@ class Prefecture(models.Model):
         expected_region = self.PREFECTURE_REGION.get(self.name)
 
         if expected_region is None:
-            raise ValidationError(
-                {"name": "Unknown prefecture."}
-            )
+            raise ValidationError({"name": "Unknown prefecture."})
 
         if self.region.get_name_display() != expected_region:
             raise ValidationError(
-                {
-                    "region": (
-                        f"{self.name} must belong to "
-                        f"{expected_region}."
-                    )
-                }
+                {"region": (f"{self.name} must belong to " f"{expected_region}.")}
             )
 
     def save(self, *args, **kwargs):
@@ -203,9 +189,7 @@ class Prefecture(models.Model):
         old_image = None
 
         if self.pk:
-            old_prefecture = Prefecture.objects.filter(
-                pk=self.pk
-            ).first()
+            old_prefecture = Prefecture.objects.filter(pk=self.pk).first()
 
             if old_prefecture:
                 old_image = old_prefecture.image
@@ -224,7 +208,6 @@ class Prefecture(models.Model):
                 self.image.delete(save=False)
 
         super().delete(*args, **kwargs)
-
 
 
 class Place(models.Model):
@@ -362,7 +345,9 @@ class PlaceRevision(models.Model):
         blank=True,
         null=True,
     )
-    prefecture = models.ForeignKey(Prefecture, on_delete=models.PROTECT, related_name="place_revisions")
+    prefecture = models.ForeignKey(
+        Prefecture, on_delete=models.PROTECT, related_name="place_revisions"
+    )
     name = models.CharField(max_length=120)
     description = models.TextField()
     image = models.ImageField(
@@ -421,7 +406,9 @@ class PlaceRevision(models.Model):
 
     class Meta:
         ordering = ("-updated_at", "-pk")
-        indexes = [models.Index(fields=("status", "-updated_at"), name="revision_status_updated_idx")]
+        indexes = [
+            models.Index(fields=("status", "-updated_at"), name="revision_status_updated_idx")
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=("place",),
@@ -436,7 +423,9 @@ class PlaceRevision(models.Model):
     def save(self, *args, **kwargs):
         old_image = None
         if self.pk:
-            old_image = PlaceRevision.objects.filter(pk=self.pk).values_list("image", flat=True).first()
+            old_image = (
+                PlaceRevision.objects.filter(pk=self.pk).values_list("image", flat=True).first()
+            )
         super().save(*args, **kwargs)
         process_model_image(self)
         if old_image and old_image != self.image.name and self.image.storage.exists(old_image):
@@ -446,7 +435,9 @@ class PlaceRevision(models.Model):
 class PlaceRevisionImage(models.Model):
     """A gallery image held with a revision until the edit is approved."""
 
-    revision = models.ForeignKey(PlaceRevision, on_delete=models.CASCADE, related_name="gallery_images")
+    revision = models.ForeignKey(
+        PlaceRevision, on_delete=models.CASCADE, related_name="gallery_images"
+    )
     image = models.ImageField(
         upload_to=place_revision_gallery_upload_path,
         validators=[validate_image_size, validate_image_safety],
@@ -467,7 +458,9 @@ class PlaceRevisionImage(models.Model):
         old_image = None
         old_thumbnail = None
         if self.pk:
-            previous = PlaceRevisionImage.objects.filter(pk=self.pk).values("image", "thumbnail").first()
+            previous = (
+                PlaceRevisionImage.objects.filter(pk=self.pk).values("image", "thumbnail").first()
+            )
             if previous:
                 old_image = previous["image"]
                 old_thumbnail = previous["thumbnail"]
@@ -476,7 +469,11 @@ class PlaceRevisionImage(models.Model):
         generate_gallery_thumbnail(self)
         if old_image and old_image != self.image.name and self.image.storage.exists(old_image):
             self.image.storage.delete(old_image)
-        if old_thumbnail and old_thumbnail != self.thumbnail.name and self.thumbnail.storage.exists(old_thumbnail):
+        if (
+            old_thumbnail
+            and old_thumbnail != self.thumbnail.name
+            and self.thumbnail.storage.exists(old_thumbnail)
+        ):
             self.thumbnail.storage.delete(old_thumbnail)
 
 
@@ -484,7 +481,9 @@ class PlaceImage(models.Model):
     """Additional ordered images for a place gallery."""
 
     place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="gallery_images")
-    image = models.ImageField(upload_to=place_gallery_upload_path, validators=[validate_image_size, validate_image_safety])
+    image = models.ImageField(
+        upload_to=place_gallery_upload_path, validators=[validate_image_size, validate_image_safety]
+    )
     thumbnail = models.ImageField(upload_to=place_thumbnail_upload_path, blank=True, editable=False)
     caption = models.CharField(max_length=160, blank=True)
     display_order = models.PositiveSmallIntegerField(default=0)
@@ -507,7 +506,11 @@ class PlaceImage(models.Model):
         generate_gallery_thumbnail(self)
         if old_image and old_image != self.image.name and self.image.storage.exists(old_image):
             self.image.storage.delete(old_image)
-        if old_thumbnail and old_thumbnail != self.thumbnail.name and self.thumbnail.storage.exists(old_thumbnail):
+        if (
+            old_thumbnail
+            and old_thumbnail != self.thumbnail.name
+            and self.thumbnail.storage.exists(old_thumbnail)
+        ):
             self.thumbnail.storage.delete(old_thumbnail)
 
     def delete(self, *args, **kwargs):
@@ -675,7 +678,9 @@ class Favorite(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        constraints = [models.UniqueConstraint(fields=("user", "place"), name="unique_user_favorite")]
+        constraints = [
+            models.UniqueConstraint(fields=("user", "place"), name="unique_user_favorite")
+        ]
 
 
 class VisitedPlace(models.Model):
@@ -687,7 +692,9 @@ class VisitedPlace(models.Model):
 
     class Meta:
         ordering = ("-visited_on", "-created_at")
-        constraints = [models.UniqueConstraint(fields=("user", "place"), name="unique_user_visited_place")]
+        constraints = [
+            models.UniqueConstraint(fields=("user", "place"), name="unique_user_visited_place")
+        ]
 
 
 class Follow(models.Model):
@@ -698,7 +705,9 @@ class Follow(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("follower", "following"), name="unique_user_follow"),
-            models.CheckConstraint(condition=~models.Q(follower=models.F("following")), name="prevent_self_follow"),
+            models.CheckConstraint(
+                condition=~models.Q(follower=models.F("following")), name="prevent_self_follow"
+            ),
         ]
 
 
@@ -708,7 +717,9 @@ class ReviewVote(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=("user", "review"), name="unique_review_helpful_vote")]
+        constraints = [
+            models.UniqueConstraint(fields=("user", "review"), name="unique_review_helpful_vote")
+        ]
 
 
 class ContentReport(models.Model):
@@ -724,8 +735,12 @@ class ContentReport(models.Model):
         blank=True,
         null=True,
     )
-    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="reports", blank=True, null=True)
-    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="reports", blank=True, null=True)
+    place = models.ForeignKey(
+        Place, on_delete=models.CASCADE, related_name="reports", blank=True, null=True
+    )
+    review = models.ForeignKey(
+        Review, on_delete=models.CASCADE, related_name="reports", blank=True, null=True
+    )
     reason = models.CharField(max_length=500)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -759,7 +774,9 @@ class Collection(models.Model):
 
     class Meta:
         ordering = ("-updated_at",)
-        constraints = [models.UniqueConstraint(fields=("owner", "name"), name="unique_owner_collection_name")]
+        constraints = [
+            models.UniqueConstraint(fields=("owner", "name"), name="unique_owner_collection_name")
+        ]
 
 
 class CollectionPlace(models.Model):
@@ -768,7 +785,9 @@ class CollectionPlace(models.Model):
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=("collection", "place"), name="unique_collection_place")]
+        constraints = [
+            models.UniqueConstraint(fields=("collection", "place"), name="unique_collection_place")
+        ]
 
 
 class Itinerary(models.Model):
@@ -793,8 +812,12 @@ class ItineraryStop(models.Model):
 
     class Meta:
         ordering = ("day", "position", "pk")
-        constraints = [models.UniqueConstraint(fields=("itinerary", "place"), name="unique_itinerary_place")]
-        indexes = [models.Index(fields=("itinerary", "day", "position"), name="itinerary_stop_order_idx")]
+        constraints = [
+            models.UniqueConstraint(fields=("itinerary", "place"), name="unique_itinerary_place")
+        ]
+        indexes = [
+            models.Index(fields=("itinerary", "day", "position"), name="itinerary_stop_order_idx")
+        ]
 
 
 class SupportTicketCounter(models.Model):

@@ -1,7 +1,6 @@
 """API validation for authenticated support requests."""
 
 from rest_framework import serializers
-
 from travel.models import SupportTicket
 from travel.support.services import clean_support_text, create_support_ticket
 

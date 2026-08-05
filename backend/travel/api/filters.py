@@ -1,6 +1,5 @@
 import django_filters
 from django.db.models import Avg
-
 from travel.models import Place
 
 

@@ -17,7 +17,11 @@ def api_exception_handler(exc, context):
         message = "Please correct the highlighted fields."
         code = "validation_error"
     else:
-        detail = response.data.get("detail", "Request failed.") if isinstance(response.data, dict) else response.data
+        detail = (
+            response.data.get("detail", "Request failed.")
+            if isinstance(response.data, dict)
+            else response.data
+        )
         message = str(detail)
         code = getattr(exc, "default_code", "request_error")
 

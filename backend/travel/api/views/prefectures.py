@@ -1,7 +1,6 @@
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from rest_framework import viewsets
-
 from travel.models import Place, Prefecture
 from travel.services import (
     annotate_places_with_ratings,
@@ -29,9 +28,7 @@ class PrefectureViewSet(viewsets.ReadOnlyModelViewSet):
         query = self.request.query_params.get("q", "").strip()
         region = self.request.query_params.get("region", "").strip()
         if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query) | Q(region__name__icontains=query)
-            )
+            queryset = queryset.filter(Q(name__icontains=query) | Q(region__name__icontains=query))
         if region:
             queryset = queryset.filter(region__name__iexact=region)
         return prefetch_prefectures_with_rating_data(
@@ -47,8 +44,7 @@ class PrefectureViewSet(viewsets.ReadOnlyModelViewSet):
                 prefectures = [
                     item
                     for item in prefectures
-                    if item.average_rating is not None
-                    and item.average_rating >= float(minimum)
+                    if item.average_rating is not None and item.average_rating >= float(minimum)
                 ]
             except ValueError:
                 prefectures = []
@@ -70,12 +66,8 @@ class PrefectureViewSet(viewsets.ReadOnlyModelViewSet):
                 )
             )
         elif ordering == "-published_place_count":
-            prefectures.sort(
-                key=lambda item: (-item.published_place_count, item.display_order)
-            )
-        return JsonResponse(
-            list(self.get_serializer(prefectures, many=True).data), safe=False
-        )
+            prefectures.sort(key=lambda item: (-item.published_place_count, item.display_order))
+        return JsonResponse(list(self.get_serializer(prefectures, many=True).data), safe=False)
 
     def retrieve(self, request, *args, **kwargs):
         prefecture = self.get_object()
@@ -84,11 +76,7 @@ class PrefectureViewSet(viewsets.ReadOnlyModelViewSet):
         places = annotate_places_with_ratings(
             Place.objects.filter(
                 prefecture=prefecture, status=Place.Status.PUBLISHED
-            ).select_related(
-                "prefecture", "prefecture__region", "author", "author__profile"
-            )
+            ).select_related("prefecture", "prefecture__region", "author", "author__profile")
         ).order_by("-created_at", "-pk")[:6]
-        data["places"] = PlaceListSerializer(
-            places, many=True, context={"request": request}
-        ).data
+        data["places"] = PlaceListSerializer(places, many=True, context={"request": request}).data
         return JsonResponse(data)

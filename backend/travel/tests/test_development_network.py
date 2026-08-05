@@ -1,7 +1,6 @@
+from config.settings.local_network import INTERFACE_IPV4_PATTERN, private_ipv4_addresses
 from django.conf import settings
 from django.test import SimpleTestCase
-
-from config.settings.local_network import INTERFACE_IPV4_PATTERN, private_ipv4_addresses
 
 
 class DevelopmentNetworkSettingsTests(SimpleTestCase):
@@ -14,9 +13,15 @@ class DevelopmentNetworkSettingsTests(SimpleTestCase):
 
     def test_private_address_filter_excludes_public_loopback_and_invalid_values(self):
         self.assertEqual(
-            private_ipv4_addresses([
-                "192.168.1.20", "10.0.0.8", "127.0.0.1", "8.8.8.8", "invalid",
-            ]),
+            private_ipv4_addresses(
+                [
+                    "192.168.1.20",
+                    "10.0.0.8",
+                    "127.0.0.1",
+                    "8.8.8.8",
+                    "invalid",
+                ]
+            ),
             ["10.0.0.8", "192.168.1.20"],
         )
 

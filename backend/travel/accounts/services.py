@@ -6,15 +6,14 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sessions.models import Session
 from django.core.exceptions import PermissionDenied
-from django.contrib.auth.tokens import default_token_generator
 from django.db import transaction
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
-
 from travel.models import Place, Profile, SupportTicket
 
 from .email_service import send_password_reset_message, send_verification_message
@@ -72,7 +71,11 @@ def send_verification_email(user, *, rotate=False):
 
 @transaction.atomic
 def request_verification_email(email):
-    user = User.objects.select_related("profile").filter(email__iexact=normalize_email(email), is_active=True).first()
+    user = (
+        User.objects.select_related("profile")
+        .filter(email__iexact=normalize_email(email), is_active=True)
+        .first()
+    )
     if not user:
         return False
     profile, _ = Profile.objects.get_or_create(user=user)
@@ -83,7 +86,11 @@ def request_verification_email(email):
 
 @transaction.atomic
 def request_password_reset_email(email):
-    user = User.objects.select_related("profile").filter(email__iexact=normalize_email(email), is_active=True).first()
+    user = (
+        User.objects.select_related("profile")
+        .filter(email__iexact=normalize_email(email), is_active=True)
+        .first()
+    )
     if not user or not user.has_usable_password():
         return False
     profile, _ = Profile.objects.get_or_create(user=user)
@@ -141,15 +148,15 @@ def delete_user_account(user):
     # no longer identify or contact the former account owner. Attachments are
     # removed only after the surrounding database transaction commits.
     tickets = list(
-        SupportTicket.objects.select_for_update()
-        .filter(user=locked_user)
-        .exclude(screenshot="")
+        SupportTicket.objects.select_for_update().filter(user=locked_user).exclude(screenshot="")
     )
     for ticket in tickets:
         storage = ticket.screenshot.storage
         name = ticket.screenshot.name
         transaction.on_commit(
-            lambda storage=storage, name=name: storage.delete(name) if storage.exists(name) else None
+            lambda storage=storage, name=name: (
+                storage.delete(name) if storage.exists(name) else None
+            )
         )
     SupportTicket.objects.filter(user=locked_user).update(
         user=None,

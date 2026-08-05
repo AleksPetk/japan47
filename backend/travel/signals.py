@@ -5,8 +5,15 @@ from django.core.cache import cache
 from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
-
-from travel.models import Place, PlaceImage, PlaceRevision, PlaceRevisionImage, Profile, Review, SupportTicket
+from travel.models import (
+    Place,
+    PlaceImage,
+    PlaceRevision,
+    PlaceRevisionImage,
+    Profile,
+    Review,
+    SupportTicket,
+)
 
 
 @receiver(pre_save, sender=User)
@@ -17,7 +24,9 @@ def normalize_user_email(sender, instance, **kwargs):
     instance._japan47_email_changed = False
     if instance.pk:
         previous = User.objects.filter(pk=instance.pk).values_list("email", flat=True).first()
-        instance._japan47_email_changed = previous is not None and previous.casefold() != instance.email.casefold()
+        instance._japan47_email_changed = (
+            previous is not None and previous.casefold() != instance.email.casefold()
+        )
 
 
 @receiver(post_save, sender=User)
@@ -44,9 +53,7 @@ def delete_profile_image(sender, instance, **kwargs):
         name = instance.profile_image.name
         # File deletion cannot be rolled back. Delay it until the database
         # transaction succeeds so a failed account deletion preserves media.
-        transaction.on_commit(
-            lambda: storage.delete(name) if storage.exists(name) else None
-        )
+        transaction.on_commit(lambda: storage.delete(name) if storage.exists(name) else None)
 
 
 @receiver(post_delete, sender=PlaceImage)

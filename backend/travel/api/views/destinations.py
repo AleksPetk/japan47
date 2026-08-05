@@ -7,23 +7,30 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
-
-from travel.models import Favorite, Place, PlaceDeletionRequest, PlaceImage, PlaceRevision, Review, ReviewVote, VisitedPlace
+from travel.models import (
+    Favorite,
+    Place,
+    PlaceDeletionRequest,
+    PlaceRevision,
+    Review,
+    ReviewVote,
+    VisitedPlace,
+)
 from travel.place_revisions import MAX_PLACE_GALLERY_IMAGES
 from travel.services import annotate_places_with_ratings
 
 from ..filters import PlaceFilter
 from ..permissions import IsOwnerOrStaff
 from ..serializers import (
-    PlaceDetailSerializer,
     PlaceDeletionRequestCreateSerializer,
     PlaceDeletionRequestSerializer,
-    PlaceListSerializer,
-    PlaceWriteSerializer,
+    PlaceDetailSerializer,
     PlaceImageSerializer,
+    PlaceListSerializer,
     PlaceRevisionImageSerializer,
-    ReviewSerializer,
+    PlaceWriteSerializer,
 )
+from .reviews import ReviewViewSet as ReviewViewSet
 
 
 class PlaceViewSet(viewsets.ModelViewSet):
@@ -39,7 +46,16 @@ class PlaceViewSet(viewsets.ModelViewSet):
     ordering = ("-created_at", "-pk")
 
     def get_permissions(self):
-        if self.action in {"create", "update", "partial_update", "destroy", "deletion_request", "images", "gallery_image", "revision_image"}:
+        if self.action in {
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+            "deletion_request",
+            "images",
+            "gallery_image",
+            "revision_image",
+        }:
             classes = [IsAuthenticated, IsOwnerOrStaff]
         else:
             classes = [AllowAny]
@@ -57,9 +73,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
         if self.request.user.is_authenticated:
             reviews = reviews.annotate(
                 viewer_found_helpful=Exists(
-                    ReviewVote.objects.filter(
-                        user=self.request.user, review_id=OuterRef("pk")
-                    )
+                    ReviewVote.objects.filter(user=self.request.user, review_id=OuterRef("pk"))
                 )
             )
         else:
@@ -101,20 +115,14 @@ class PlaceViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and (user.is_superuser or user.is_staff):
             return queryset
         if user.is_authenticated:
-            return queryset.filter(
-                Q(status=Place.Status.PUBLISHED) | Q(author=user)
-            ).distinct()
+            return queryset.filter(Q(status=Place.Status.PUBLISHED) | Q(author=user)).distinct()
         return queryset.filter(status=Place.Status.PUBLISHED)
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def mine(self, request):
-        queryset = self.filter_queryset(
-            self.get_queryset().filter(author=request.user)
-        )
+        queryset = self.filter_queryset(self.get_queryset().filter(author=request.user))
         page = self.paginate_queryset(queryset)
-        serializer = PlaceListSerializer(
-            page, many=True, context={"request": request}
-        )
+        serializer = PlaceListSerializer(page, many=True, context={"request": request})
         response = self.get_paginated_response(serializer.data)
         return JsonResponse(response.data)
 
@@ -123,16 +131,17 @@ class PlaceViewSet(viewsets.ModelViewSet):
         """Return places receiving the most review activity in the last month."""
 
         cutoff = timezone.now() - timedelta(days=30)
-        queryset = self.get_queryset().annotate(
-            recent_review_count=Count(
-                "reviews", filter=Q(reviews__created_at__gte=cutoff), distinct=True
+        queryset = (
+            self.get_queryset()
+            .annotate(
+                recent_review_count=Count(
+                    "reviews", filter=Q(reviews__created_at__gte=cutoff), distinct=True
+                )
             )
-        ).filter(recent_review_count__gt=0).order_by(
-            "-recent_review_count", "-average_rating", "-created_at"
-        )[:6]
-        data = PlaceListSerializer(
-            queryset, many=True, context={"request": request}
-        ).data
+            .filter(recent_review_count__gt=0)
+            .order_by("-recent_review_count", "-average_rating", "-created_at")[:6]
+        )
+        data = PlaceListSerializer(queryset, many=True, context={"request": request}).data
         return JsonResponse({"results": list(data)})
 
     def retrieve(self, request, *args, **kwargs):
@@ -153,11 +162,14 @@ class PlaceViewSet(viewsets.ModelViewSet):
             .select_related("author", "author__profile", "prefecture", "prefecture__region")
         ).order_by("-average_rating", "-created_at")[:3]
         distribution = {
-            rating: place.reviews.filter(rating=rating).count()
-            for rating in range(5, 0, -1)
+            rating: place.reviews.filter(rating=rating).count() for rating in range(5, 0, -1)
         }
-        data["related_places"] = PlaceListSerializer(related, many=True, context={"request": request}).data
-        data["nearby_places"] = PlaceListSerializer(nearby, many=True, context={"request": request}).data
+        data["related_places"] = PlaceListSerializer(
+            related, many=True, context={"request": request}
+        ).data
+        data["nearby_places"] = PlaceListSerializer(
+            nearby, many=True, context={"request": request}
+        ).data
         data["rating_distribution"] = distribution
         return JsonResponse(data)
 
@@ -249,17 +261,34 @@ class PlaceViewSet(viewsets.ModelViewSet):
     def images(self, request, pk=None):
         place = self.get_object()
         if not (request.user.is_staff or place.author_id == request.user.id):
-            return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can add gallery images."}}, status=403)
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "permission_denied",
+                        "message": "Only the owner can add gallery images.",
+                    }
+                },
+                status=403,
+            )
         with transaction.atomic():
             place = Place.objects.select_for_update().get(pk=place.pk)
             if place.status == Place.Status.PUBLISHED:
-                revision = PlaceRevision.objects.select_for_update().filter(
-                    place=place,
-                    status=PlaceRevision.Status.PENDING,
-                ).first()
+                revision = (
+                    PlaceRevision.objects.select_for_update()
+                    .filter(
+                        place=place,
+                        status=PlaceRevision.Status.PENDING,
+                    )
+                    .first()
+                )
                 if revision is None:
                     return JsonResponse(
-                        {"error": {"code": "pending_revision_required", "message": "Save the proposed place changes before adding gallery images."}},
+                        {
+                            "error": {
+                                "code": "pending_revision_required",
+                                "message": "Save the proposed place changes before adding gallery images.",
+                            }
+                        },
                         status=409,
                     )
                 effective_count = (
@@ -268,51 +297,130 @@ class PlaceViewSet(viewsets.ModelViewSet):
                     + revision.gallery_images.count()
                 )
                 if effective_count >= MAX_PLACE_GALLERY_IMAGES:
-                    return JsonResponse({"error": {"code": "validation_error", "message": "Please correct the highlighted fields.", "fields": {"gallery_images": [f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos."]}}}, status=400)
-                serializer = PlaceRevisionImageSerializer(data=request.data, context={"request": request})
+                    return JsonResponse(
+                        {
+                            "error": {
+                                "code": "validation_error",
+                                "message": "Please correct the highlighted fields.",
+                                "fields": {
+                                    "gallery_images": [
+                                        f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos."
+                                    ]
+                                },
+                            }
+                        },
+                        status=400,
+                    )
+                serializer = PlaceRevisionImageSerializer(
+                    data=request.data, context={"request": request}
+                )
                 serializer.is_valid(raise_exception=True)
                 serializer.save(revision=revision)
                 return JsonResponse({**serializer.data, "pending_revision": True}, status=201)
             if place.gallery_images.count() >= MAX_PLACE_GALLERY_IMAGES:
-                return JsonResponse({"error": {"code": "validation_error", "message": "Please correct the highlighted fields.", "fields": {"gallery_images": [f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos."]}}}, status=400)
+                return JsonResponse(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": "Please correct the highlighted fields.",
+                            "fields": {
+                                "gallery_images": [
+                                    f"A place can have up to {MAX_PLACE_GALLERY_IMAGES} gallery photos."
+                                ]
+                            },
+                        }
+                    },
+                    status=400,
+                )
             serializer = PlaceImageSerializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
             serializer.save(place=place)
         return JsonResponse(serializer.data, status=201)
 
-    @action(detail=True, methods=["post", "delete"], permission_classes=[IsAuthenticated], url_path=r"images/(?P<image_id>[^/.]+)")
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        permission_classes=[IsAuthenticated],
+        url_path=r"images/(?P<image_id>[^/.]+)",
+    )
     def gallery_image(self, request, pk=None, image_id=None):
         place = self.get_object()
         if not (request.user.is_staff or place.author_id == request.user.id):
-            return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can manage gallery images."}}, status=403)
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "permission_denied",
+                        "message": "Only the owner can manage gallery images.",
+                    }
+                },
+                status=403,
+            )
         image = place.gallery_images.filter(pk=image_id).first()
         if image is None:
-            return JsonResponse({"error": {"code": "not_found", "message": "Gallery image not found."}}, status=404)
+            return JsonResponse(
+                {"error": {"code": "not_found", "message": "Gallery image not found."}}, status=404
+            )
         if place.status == Place.Status.PUBLISHED:
-            revision = PlaceRevision.objects.filter(place=place, status=PlaceRevision.Status.PENDING).first()
+            revision = PlaceRevision.objects.filter(
+                place=place, status=PlaceRevision.Status.PENDING
+            ).first()
             if revision is None:
-                return JsonResponse({"error": {"code": "pending_revision_required", "message": "Save the proposed place changes before managing gallery images."}}, status=409)
+                return JsonResponse(
+                    {
+                        "error": {
+                            "code": "pending_revision_required",
+                            "message": "Save the proposed place changes before managing gallery images.",
+                        }
+                    },
+                    status=409,
+                )
             if request.method == "DELETE":
                 revision.removed_gallery_images.add(image)
             else:
                 revision.removed_gallery_images.remove(image)
             return JsonResponse({"pending_revision": True, "removed": request.method == "DELETE"})
         if request.method != "DELETE":
-            return JsonResponse({"error": {"code": "method_not_allowed", "message": "This gallery image is not pending removal."}}, status=405)
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "method_not_allowed",
+                        "message": "This gallery image is not pending removal.",
+                    }
+                },
+                status=405,
+            )
         image.delete()
         response = JsonResponse({}, status=204)
         response.content = b""
         return response
 
-    @action(detail=True, methods=["delete"], permission_classes=[IsAuthenticated], url_path=r"revision-images/(?P<image_id>[^/.]+)")
+    @action(
+        detail=True,
+        methods=["delete"],
+        permission_classes=[IsAuthenticated],
+        url_path=r"revision-images/(?P<image_id>[^/.]+)",
+    )
     def revision_image(self, request, pk=None, image_id=None):
         place = self.get_object()
         if not (request.user.is_staff or place.author_id == request.user.id):
-            return JsonResponse({"error": {"code": "permission_denied", "message": "Only the owner can manage proposed gallery images."}}, status=403)
-        revision = PlaceRevision.objects.filter(place=place, status=PlaceRevision.Status.PENDING).first()
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "permission_denied",
+                        "message": "Only the owner can manage proposed gallery images.",
+                    }
+                },
+                status=403,
+            )
+        revision = PlaceRevision.objects.filter(
+            place=place, status=PlaceRevision.Status.PENDING
+        ).first()
         image = revision.gallery_images.filter(pk=image_id).first() if revision else None
         if image is None:
-            return JsonResponse({"error": {"code": "not_found", "message": "Proposed gallery image not found."}}, status=404)
+            return JsonResponse(
+                {"error": {"code": "not_found", "message": "Proposed gallery image not found."}},
+                status=404,
+            )
         image.delete()
         response = JsonResponse({}, status=204)
         response.content = b""
@@ -342,44 +450,3 @@ class PlaceViewSet(viewsets.ModelViewSet):
             return response
         visited, created = VisitedPlace.objects.get_or_create(user=request.user, place=place)
         return JsonResponse({"visited": True}, status=201 if created else 200)
-
-
-class ReviewViewSet(viewsets.ModelViewSet):
-    serializer_class = ReviewSerializer
-    permission_classes = [IsOwnerOrStaff]
-    http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
-
-    def get_permissions(self):
-        if self.action == "create":
-            return [IsAuthenticated()]
-        return super().get_permissions()
-
-    def get_queryset(self):
-        queryset = Review.objects.select_related(
-            "author", "author__profile", "place", "place__prefecture"
-        )
-        user = self.request.user
-        if not (user.is_authenticated and user.is_staff):
-            visibility = Q(place__status=Place.Status.PUBLISHED)
-            if user.is_authenticated:
-                visibility |= Q(place__author=user)
-            queryset = queryset.filter(visibility)
-        place_id = self.request.query_params.get("place")
-        author_id = self.request.query_params.get("author")
-        if place_id:
-            queryset = queryset.filter(place_id=place_id)
-        if author_id:
-            queryset = queryset.filter(author_id=author_id)
-        return queryset
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-
-    @action(detail=True, methods=["post", "delete"], permission_classes=[IsAuthenticated])
-    def helpful(self, request, pk=None):
-        review = self.get_object()
-        if request.method == "DELETE":
-            ReviewVote.objects.filter(review=review, user=request.user).delete()
-            return JsonResponse({}, status=204)
-        vote, created = ReviewVote.objects.get_or_create(review=review, user=request.user)
-        return JsonResponse({"helpful": True}, status=201 if created else 200)

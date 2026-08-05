@@ -4,7 +4,6 @@ from django.http import JsonResponse
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import ScopedRateThrottle
-
 from travel.accounts.email_service import EmailDeliveryError
 from travel.accounts.services import request_password_reset_email, request_verification_email
 from travel.accounts.tokens import consume_email_verification_token
@@ -16,7 +15,9 @@ from ..account_serializers import (
 )
 
 VERIFICATION_RESPONSE = "If an unverified account exists for this email address, a new confirmation email has been sent."
-PASSWORD_RESET_RESPONSE = "If an account exists for that email address, we have sent password-reset instructions."
+PASSWORD_RESET_RESPONSE = (
+    "If an account exists for that email address, we have sent password-reset instructions."
+)
 
 
 class ResendVerificationView(generics.GenericAPIView):
@@ -81,7 +82,9 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return JsonResponse({
-            "result": "success",
-            "message": "Password Changed Successfully",
-        })
+        return JsonResponse(
+            {
+                "result": "success",
+                "message": "Password Changed Successfully",
+            }
+        )

@@ -15,7 +15,6 @@ from PIL import Image
 from rest_framework.test import APIClient, APITestCase
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from travel.accounts.services import delete_user_account
 from travel.models import (
     Collection,
@@ -55,7 +54,9 @@ class AccountDeletionTests(APITestCase):
         self.other = User.objects.create_user("other", "other@example.com", self.password)
         Profile.objects.filter(user=self.user).update(email_verified=True)
         self.region = Region.objects.create(name=Region.RegionName.KANTO, display_order=1)
-        self.prefecture = Prefecture.objects.create(region=self.region, name="Tokyo", display_order=1)
+        self.prefecture = Prefecture.objects.create(
+            region=self.region, name="Tokyo", display_order=1
+        )
         self.place = Place.objects.create(
             author=self.user,
             prefecture=self.prefecture,
@@ -84,9 +85,7 @@ class AccountDeletionTests(APITestCase):
 
     def test_missing_and_wrong_password_are_rejected(self):
         self.authenticate()
-        missing = self.client.post(
-            "/api/v1/auth/account/delete/", {"confirmation": "DELETE"}
-        )
+        missing = self.client.post("/api/v1/auth/account/delete/", {"confirmation": "DELETE"})
         wrong = self.client.post(
             "/api/v1/auth/account/delete/",
             {"password": "WrongPass123!", "confirmation": "DELETE"},
@@ -225,9 +224,7 @@ class AccountDeletionTests(APITestCase):
         self.assertFalse(Collection.objects.filter(owner_id=user_id).exists())
         self.assertFalse(Itinerary.objects.filter(owner_id=user_id).exists())
         self.assertFalse(Profile.objects.filter(user_id=user_id).exists())
-        self.assertFalse(
-            records["profile_image_storage"].exists(records["profile_image_name"])
-        )
+        self.assertFalse(records["profile_image_storage"].exists(records["profile_image_name"]))
         self.assertFalse(records["screenshot_storage"].exists(records["screenshot_name"]))
         self.assertFalse(TOTPDevice.objects.filter(user_id=user_id).exists())
         self.assertFalse(StaticDevice.objects.filter(user_id=user_id).exists())
@@ -281,7 +278,9 @@ class AccountDeletionTests(APITestCase):
             },
         )
         self.assertEqual(registered.status_code, 201)
-        self.assertTrue(User.objects.filter(username="traveler", email="traveler@example.com").exists())
+        self.assertTrue(
+            User.objects.filter(username="traveler", email="traveler@example.com").exists()
+        )
 
     def test_existing_access_and_refresh_tokens_fail_after_deletion(self):
         refresh = RefreshToken.for_user(self.user)

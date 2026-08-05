@@ -9,12 +9,12 @@ def region_image_upload_path(instance, filename):
     return f"region_images/{instance.name}{extension}"
 
 
-
 def prefecture_image_upload_path(instance, filename):
     """Prefecture image path processing function."""
 
     extension = Path(filename).suffix.lower()
     return f"prefecture_images/{instance.name}{extension}"
+
 
 def place_image_upload_path(instance, filename):
     """Generate a unique upload for a post image."""
@@ -54,7 +54,9 @@ def place_revision_gallery_upload_path(instance, filename):
 def place_revision_thumbnail_upload_path(instance, filename):
     """Store preview thumbnails for proposed gallery additions."""
 
-    return f"place_revisions/user_{instance.revision.place.author_id}/thumbnails/{uuid.uuid4()}.webp"
+    return (
+        f"place_revisions/user_{instance.revision.place.author_id}/thumbnails/{uuid.uuid4()}.webp"
+    )
 
 
 def profile_image_upload_path(instance, filename):

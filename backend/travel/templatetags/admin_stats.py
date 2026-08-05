@@ -6,8 +6,16 @@ from django import template
 from django.contrib.auth.models import User
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
-
-from travel.models import ContentReport, Place, PlaceDeletionRequest, PlaceRevision, Prefecture, Region, Review, SupportTicket
+from travel.models import (
+    ContentReport,
+    Place,
+    PlaceDeletionRequest,
+    PlaceRevision,
+    Prefecture,
+    Region,
+    Review,
+    SupportTicket,
+)
 
 register = template.Library()
 
@@ -48,7 +56,9 @@ def admin_metrics(request):
     )
     reviews = Review.objects.aggregate(total=Count("id"), average=Avg("rating"))
     pending_revisions = PlaceRevision.objects.filter(status=PlaceRevision.Status.PENDING).count()
-    pending_deletions = PlaceDeletionRequest.objects.filter(status=PlaceDeletionRequest.Status.PENDING).count()
+    pending_deletions = PlaceDeletionRequest.objects.filter(
+        status=PlaceDeletionRequest.Status.PENDING
+    ).count()
 
     metrics = {
         **places,
@@ -96,7 +106,10 @@ def japan47_admin_sidebar(context):
         for model in app["models"]:
             model_data = dict(model)
             count, query = definitions.get(model["object_name"], (0, ""))
-            model_data.update(attention_count=count, attention_url=(f'{model["admin_url"]}?{query}' if count else ""))
+            model_data.update(
+                attention_count=count,
+                attention_url=(f'{model["admin_url"]}?{query}' if count else ""),
+            )
             if model["object_name"] == "ContentReport":
                 model_data["reported_reviews"] = counts["reported_reviews"]
                 model_data["reported_places"] = counts["reported_places"]

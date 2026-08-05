@@ -44,7 +44,9 @@ def _admin_context(request, **extra):
 def _safe_admin_next(request):
     candidate = request.POST.get("next") or request.GET.get("next") or reverse("admin:index")
     prefix = f"/{settings.ADMIN_PATH}"
-    if url_has_allowed_host_and_scheme(candidate, allowed_hosts={request.get_host()}) and candidate.startswith(prefix):
+    if url_has_allowed_host_and_scheme(
+        candidate, allowed_hosts={request.get_host()}
+    ) and candidate.startswith(prefix):
         return candidate
     return reverse("admin:index")
 
@@ -62,7 +64,9 @@ def _replace_recovery_codes(user):
     devices = StaticDevice.objects.filter(user=user).order_by("pk")
     device = devices.first()
     if device is None:
-        device = StaticDevice.objects.create(user=user, name="Japan47 recovery codes", confirmed=True)
+        device = StaticDevice.objects.create(
+            user=user, name="Japan47 recovery codes", confirmed=True
+        )
     else:
         devices.exclude(pk=device.pk).delete()
         device.token_set.all().delete()
@@ -131,17 +135,23 @@ def setup(request):
             device.save(update_fields=("confirmed",))
             request.session["japan47_recovery_codes"] = _replace_recovery_codes(request.user)
             otp_login(request, device)
-            messages.success(request, "Google Authenticator is now required for this admin account.")
+            messages.success(
+                request, "Google Authenticator is now required for this admin account."
+            )
             return redirect("admin-2fa-codes")
         error = "Enter the current six-digit code from Google Authenticator."
 
-    return render(request, "admin/2fa_setup.html", _admin_context(
+    return render(
         request,
-        title="Set up Google Authenticator",
-        qr_data_url=_qr_data_url(device),
-        error=error,
-        next=_safe_admin_next(request),
-    ))
+        "admin/2fa_setup.html",
+        _admin_context(
+            request,
+            title="Set up Google Authenticator",
+            qr_data_url=_qr_data_url(device),
+            error=error,
+            next=_safe_admin_next(request),
+        ),
+    )
 
 
 @never_cache
@@ -154,14 +164,21 @@ def verify(request):
     error = None
     if request.method == "POST":
         token = request.POST.get("token", "").strip()
-        device = next((verify_token(request.user, item.persistent_id, token) for item in devices if token), None)
+        device = next(
+            (verify_token(request.user, item.persistent_id, token) for item in devices if token),
+            None,
+        )
         if device:
             otp_login(request, device)
             return redirect(_safe_admin_next(request))
         error = "That authenticator code is invalid or expired."
-    return render(request, "admin/2fa_verify.html", _admin_context(
-        request, title="Two-factor verification", error=error, next=_safe_admin_next(request)
-    ))
+    return render(
+        request,
+        "admin/2fa_verify.html",
+        _admin_context(
+            request, title="Two-factor verification", error=error, next=_safe_admin_next(request)
+        ),
+    )
 
 
 @never_cache
@@ -174,15 +191,24 @@ def recovery(request):
     if request.method == "POST":
         token = request.POST.get("token", "").strip().lower()
         devices = StaticDevice.objects.filter(user=request.user, confirmed=True)
-        device = next((verify_token(request.user, item.persistent_id, token) for item in devices if token), None)
+        device = next(
+            (verify_token(request.user, item.persistent_id, token) for item in devices if token),
+            None,
+        )
         if device:
             otp_login(request, device)
-            messages.warning(request, "A one-use recovery code was consumed. Regenerate codes if few remain.")
+            messages.warning(
+                request, "A one-use recovery code was consumed. Regenerate codes if few remain."
+            )
             return redirect(_safe_admin_next(request))
         error = "That recovery code is invalid or has already been used."
-    return render(request, "admin/2fa_recovery.html", _admin_context(
-        request, title="Use a recovery code", error=error, next=_safe_admin_next(request)
-    ))
+    return render(
+        request,
+        "admin/2fa_recovery.html",
+        _admin_context(
+            request, title="Use a recovery code", error=error, next=_safe_admin_next(request)
+        ),
+    )
 
 
 @never_cache
@@ -196,6 +222,8 @@ def recovery_codes(request):
         messages.warning(request, "Old unused recovery codes were invalidated.")
         return redirect("admin-2fa-codes")
     codes = request.session.pop("japan47_recovery_codes", None)
-    return render(request, "admin/2fa_codes.html", _admin_context(
-        request, title="Recovery codes", recovery_codes=codes
-    ))
+    return render(
+        request,
+        "admin/2fa_codes.html",
+        _admin_context(request, title="Recovery codes", recovery_codes=codes),
+    )
