@@ -1,37 +1,7 @@
-import { writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import { PREFECTURES, REGIONS } from './src/data/geography.js'
 
-const staticPublicRoutes = ['', 'regions', 'prefectures', 'places', 'search', 'privacy', 'terms']
-
-function sitemapPaths() {
-  return [
-    ...staticPublicRoutes,
-    ...REGIONS.map((region) => `regions/${region.name}`),
-    ...PREFECTURES.map((prefecture) => `prefectures/${encodeURIComponent(prefecture.name)}`),
-  ]
-}
-
-// Static crawl files are generated from the deployment URL, avoiding a domain
-// hardcode while still producing valid absolute sitemap locations.
-function seoFiles(publicUrl) {
-  const origin = publicUrl.replace(/\/$/, '')
-  return {
-    name: 'japan47-seo-files',
-    transformIndexHtml(html) {
-      return html.replaceAll('https://example.com/', `${origin}/`)
-    },
-    closeBundle() {
-      const urls = sitemapPaths().map((route) => `  <url><loc>${origin}/${route}</loc></url>`).join('\n')
-      writeFileSync(resolve('dist/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`)
-      // Allow Googlebot to fetch public geography JSON for SPA rendering; keep
-      // the broader /api/ disallow so auth and private endpoints stay blocked.
-      writeFileSync(resolve('dist/robots.txt'), `User-agent: *\n\nAllow: /\nAllow: /api/v1/regions/\nAllow: /api/v1/prefectures/\n\nDisallow: /j47-management/\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`)
-    },
-  }
-}
+// robots.txt and sitemap.xml are written by scripts/prerender.mjs after pages exist.
 
 // Analytics is injected into the built document only for production builds,
 // keeping local development and test sessions out of the production metrics.
@@ -54,12 +24,23 @@ function umamiAnalytics(enabled) {
   }
 }
 
+function publicUrlRewrite(publicUrl) {
+  const origin = publicUrl.replace(/\/$/, '')
+  return {
+    name: 'japan47-public-url-rewrite',
+    transformIndexHtml(html) {
+      return html.replaceAll('https://example.com/', `${origin}/`)
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '')
+  const publicUrl = process.env.VITE_PUBLIC_URL || env.VITE_PUBLIC_URL || 'http://localhost:5173'
   return {
   plugins: [
     react(),
-    seoFiles(process.env.VITE_PUBLIC_URL || env.VITE_PUBLIC_URL || 'http://localhost:5173'),
+    publicUrlRewrite(publicUrl),
     umamiAnalytics(mode === 'production'),
   ],
   server: {

@@ -9,6 +9,7 @@ const distDir = resolve(root, 'dist')
 const templatePath = resolve(distDir, 'index.html')
 
 const origin = (process.env.VITE_PUBLIC_URL || 'https://japan47.alekspetk.com').replace(/\/$/, '')
+const apiBase = (process.env.PRERENDER_API_BASE || `${origin}/api/v1`).replace(/\/$/, '')
 
 /** Strings that must never appear in prerendered HTML (runtime async UI). */
 const FORBIDDEN_SNIPPETS = [
@@ -44,6 +45,10 @@ const listRouteMeta = {
     title: 'Places to Visit in Japan — Community Travel Guide | Japan47',
     description: 'Find places to visit across Japan, with traveler reviews, ratings, local tips, and community recommendations.',
   },
+  '/search': {
+    title: 'Search Japan Travel Destinations | Japan47',
+    description: 'Search published places, prefectures, and regions across Japan to find your next destination on Japan47.',
+  },
   '/privacy': {
     title: 'Privacy Policy | Japan47',
     description: 'Japan 47 uses account and contribution data to operate the travel community. Email addresses are private, public contributions are visible to others, and we do not sell personal information.',
@@ -67,6 +72,14 @@ function absoluteUrl(path) {
   return `${origin}${path.startsWith('/') ? path : `/${path}`}`
 }
 
+function summarize(value, fallback, limit = 160) {
+  const text = String(value || fallback || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (text.length <= limit) return text
+  return `${text.slice(0, limit - 1).trimEnd()}…`
+}
+
 function replaceMetaName(html, name, content) {
   const pattern = new RegExp(`(<meta\\s+name="${name}"\\s+content=")[^"]*(")`, 'i')
   if (!pattern.test(html)) {
@@ -83,11 +96,20 @@ function replaceMetaProperty(html, property, content) {
   return html.replace(pattern, `$1${escapeHtml(content)}$2`)
 }
 
-function applyHead(html, { title, description, canonicalPath }) {
+function applyHead(html, {
+  title,
+  description,
+  canonicalPath,
+  ogType = 'website',
+  image,
+  imageType,
+  jsonLd,
+}) {
   const canonical = absoluteUrl(canonicalPath)
   let next = html
   next = next.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`)
   next = replaceMetaName(next, 'description', description)
+  next = replaceMetaProperty(next, 'og:type', ogType)
   next = replaceMetaProperty(next, 'og:title', title)
   next = replaceMetaProperty(next, 'og:description', description)
   next = replaceMetaProperty(next, 'og:url', canonical)
@@ -97,6 +119,29 @@ function applyHead(html, { title, description, canonicalPath }) {
     /(<link\s+rel="canonical"\s+href=")[^"]*(")/i,
     `$1${escapeHtml(canonical)}$2`,
   )
+  if (image) {
+    // Prefer absolute image URLs from the API as-is.
+    const resolvedImage = /^https?:\/\//i.test(image) ? image : absoluteUrl(image)
+    next = replaceMetaProperty(next, 'og:image', resolvedImage)
+    next = replaceMetaName(next, 'twitter:image', resolvedImage)
+    if (imageType) {
+      next = replaceMetaProperty(next, 'og:image:type', imageType)
+    }
+  }
+  if (jsonLd) {
+    const serialized = JSON.stringify(jsonLd).replace(/</g, '\\u003c')
+    if (/<script\s+type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/i.test(next)) {
+      next = next.replace(
+        /<script\s+type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/i,
+        `<script type="application/ld+json">${serialized}</script>`,
+      )
+    } else {
+      next = next.replace(
+        /<\/head>/i,
+        `    <script type="application/ld+json">${serialized}</script>\n  </head>`,
+      )
+    }
+  }
   return next
 }
 
@@ -144,6 +189,28 @@ function writePage(canonicalPath, html) {
   return outputPath
 }
 
+function writeSitemap(paths) {
+  const urls = paths
+    .map((path) => {
+      const loc = path === '/' ? `${origin}/` : `${origin}${path}`
+      return `  <url><loc>${loc}</loc></url>`
+    })
+    .join('\n')
+  writeFileSync(
+    resolve(distDir, 'sitemap.xml'),
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
+  )
+}
+
+function writeRobots() {
+  // Allow Googlebot to fetch public geography and place JSON for SPA rendering;
+  // keep the broader /api/ disallow so auth and private endpoints stay blocked.
+  writeFileSync(
+    resolve(distDir, 'robots.txt'),
+    `User-agent: *\n\nAllow: /\nAllow: /api/v1/regions/\nAllow: /api/v1/prefectures/\nAllow: /api/v1/places/\n\nDisallow: /j47-management/\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`,
+  )
+}
+
 function assertSafeHtml(canonicalPath, html) {
   for (const snippet of FORBIDDEN_SNIPPETS) {
     if (html.includes(snippet)) {
@@ -160,7 +227,87 @@ function assertContains(canonicalPath, html, needles) {
   }
 }
 
-function buildPages() {
+function imageContentType(value) {
+  const pathname = (() => {
+    try {
+      return new URL(value, `${origin}/`).pathname.toLowerCase()
+    } catch {
+      return ''
+    }
+  })()
+  if (pathname.endsWith('.png')) return 'image/png'
+  if (pathname.endsWith('.webp')) return 'image/webp'
+  if (pathname.endsWith('.gif')) return 'image/gif'
+  return 'image/jpeg'
+}
+
+function buildPlaceSchema(place, { description, canonicalUrl, socialImage }) {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'TouristAttraction',
+    '@id': `${canonicalUrl}#attraction`,
+    name: place.name,
+    description,
+    url: canonicalUrl,
+    image: socialImage || undefined,
+    mainEntityOfPage: canonicalUrl,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: place.city || undefined,
+      addressRegion: place.prefecture?.name,
+      addressCountry: 'JP',
+    },
+  }
+  if (place.average_rating && place.review_count) {
+    schema.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: place.average_rating,
+      reviewCount: place.review_count,
+      bestRating: 5,
+      worstRating: 1,
+    }
+  }
+  if (place.official_website) {
+    schema.sameAs = place.official_website
+  }
+  return schema
+}
+
+async function fetchPublishedPlaces() {
+  if (process.env.PRERENDER_SKIP_PLACES === '1') {
+    console.warn('PRERENDER_SKIP_PLACES=1 — skipping published place prerender')
+    return []
+  }
+
+  const places = []
+  let page = 1
+  let pages = 1
+
+  while (page <= pages) {
+    const url = `${apiBase}/places/?page=${page}&page_size=100`
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': 'Japan47Prerender/1.0' },
+    })
+    if (!response.ok) {
+      throw new Error(`Place list fetch failed (${response.status}) for ${url}`)
+    }
+    const payload = await response.json()
+    pages = Number(payload.pages) || 1
+    const results = Array.isArray(payload.results) ? payload.results : []
+    for (const place of results) {
+      if (place?.status && place.status !== 'published') continue
+      if (!place?.id || !place?.slug || !place?.name || !place?.prefecture?.name) {
+        throw new Error(`Incomplete published place payload: ${JSON.stringify(place)}`)
+      }
+      places.push(place)
+    }
+    page += 1
+  }
+
+  return places
+}
+
+function buildStaticPages() {
   const regionLinks = REGIONS.map((region) => ({
     href: `/regions/${region.name}`,
     label: region.label,
@@ -242,6 +389,24 @@ function buildPages() {
           ${linkList(regionLinks)}
           <h2>Explore by prefecture</h2>
           ${regionPrefectureSections()}
+        </main>
+      `,
+    },
+    {
+      path: '/search',
+      ...listRouteMeta['/search'],
+      required: [
+        'Find your next discovery',
+        'Search published places, prefectures, and regions.',
+        listRouteMeta['/search'].description,
+      ],
+      body: `
+        <main>
+          <p>Search Japan 47</p>
+          <h1>Find your next discovery</h1>
+          <p>Search published places, prefectures, and regions.</p>
+          <p>${escapeHtml(listRouteMeta['/search'].description)}</p>
+          <p><a href="/places">Browse places</a> · <a href="/prefectures">Browse prefectures</a> · <a href="/regions">Browse regions</a></p>
         </main>
       `,
     },
@@ -332,9 +497,56 @@ function buildPages() {
   return pages
 }
 
-function prerender() {
+function buildPlacePages(places) {
+  return places.map((place) => {
+    const path = `/places/${place.id}/${encodeURIComponent(place.slug)}`
+    const canonicalUrl = absoluteUrl(path)
+    const description = summarize(
+      place.description,
+      `Discover ${place.name} in ${place.prefecture.name}, Japan, with traveler ratings, reviews, and practical travel information.`,
+    )
+    const title = `${place.name}, ${place.prefecture.name} | Japan47`
+    const regionLabel = place.prefecture.region?.label
+    const socialImage = place.image_url || undefined
+    const jsonLd = buildPlaceSchema(place, {
+      description,
+      canonicalUrl,
+      socialImage,
+    })
+
+    return {
+      path,
+      title,
+      description,
+      ogType: 'article',
+      image: socialImage,
+      imageType: socialImage ? imageContentType(socialImage) : undefined,
+      jsonLd,
+      required: [
+        place.name,
+        place.prefecture.name,
+        description,
+        `href="${canonicalUrl}"`,
+        'TouristAttraction',
+      ],
+      body: `
+        <main>
+          <p><a href="/places">Places</a> / <a href="/prefectures/${encodeURIComponent(place.prefecture.name)}">${escapeHtml(place.prefecture.name)}</a> / ${escapeHtml(place.name)}</p>
+          <p>${escapeHtml(regionLabel || 'Japan')}${place.city ? ` · ${escapeHtml(place.city)}` : ''} · ${escapeHtml(place.prefecture.name)}</p>
+          <h1>${escapeHtml(place.name)}</h1>
+          <p>${escapeHtml(description)}</p>
+          <p>${escapeHtml(place.description || description)}</p>
+          <p><a href="/prefectures/${encodeURIComponent(place.prefecture.name)}">More places in ${escapeHtml(place.prefecture.name)}</a></p>
+        </main>
+      `,
+    }
+  })
+}
+
+async function prerender() {
   const template = readFileSync(templatePath, 'utf8')
-  const pages = buildPages()
+  const places = await fetchPublishedPlaces()
+  const pages = [...buildStaticPages(), ...buildPlacePages(places)]
   const written = []
 
   for (const page of pages) {
@@ -342,6 +554,10 @@ function prerender() {
       title: page.title,
       description: page.description,
       canonicalPath: page.path,
+      ogType: page.ogType,
+      image: page.image,
+      imageType: page.imageType,
+      jsonLd: page.jsonLd,
     })
     html = injectPrerender(html, page.body)
     assertSafeHtml(page.path, html)
@@ -352,7 +568,12 @@ function prerender() {
     written.push(writePage(page.path, html))
   }
 
-  console.log(`Prerendered ${written.length} HTML pages for ${origin}`)
+  writeSitemap(pages.map((page) => page.path))
+  writeRobots()
+  console.log(`Prerendered ${written.length} HTML pages for ${origin} (${places.length} places)`)
 }
 
-prerender()
+prerender().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

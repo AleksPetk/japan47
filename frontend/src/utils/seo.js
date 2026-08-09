@@ -28,6 +28,12 @@ const routeMetadata = {
       'Find places to visit across Japan, with traveler reviews, ratings, local tips, and community recommendations.',
     canonicalPath: '/places',
   },
+  '/search': {
+    title: 'Search Japan Travel Destinations | Japan47',
+    description:
+      'Search published places, prefectures, and regions across Japan to find your next destination on Japan47.',
+    canonicalPath: '/search',
+  },
   '/support': {
     title: 'Support Japan47 — Help Keep the Community Project Running',
     description:
