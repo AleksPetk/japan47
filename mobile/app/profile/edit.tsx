@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button, Field, FormScreen, Hero, ImagePickerField, Input, Notice } from '@/components/core';
 import { useAuth } from '@/context/auth-context';
 import { colors, radius, spacing, typography } from '@/constants/theme';
@@ -27,12 +27,12 @@ export default function ProfileEditScreen() {
     {message ? <Notice tone={Object.keys(errors).length ? 'danger' : 'success'}>{message}</Notice> : null}
     <View style={styles.form}><Field label="Nickname" error={errors.nickname}><Input value={nickname} onChangeText={setNickname} maxLength={80} /></Field><Field label="Email" error={errors.email}><Input value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" /></Field><ImagePickerField label="Profile photo" asset={image} onChange={(value) => setImage(value as ImagePicker.ImagePickerAsset | null)} error={errors.profile_image} /><Button label={busy ? 'Saving…' : 'Save profile'} disabled={busy || !email} onPress={save} /></View>
     <View style={styles.danger}><Text style={styles.dangerEyebrow}>DANGER ZONE</Text><Text style={styles.dangerTitle}>Delete account</Text><Text style={styles.dangerCopy}>Permanently remove your account and personal travel data. Submitted places may remain as community content.</Text><Button label="Delete account" variant="danger" onPress={() => setDeleteStep('initial')} /></View>
-    <Modal visible={Boolean(deleteStep)} transparent animationType="slide" onRequestClose={closeDelete}><View style={styles.backdrop}><View style={styles.sheet}><ScrollView contentContainerStyle={styles.sheetContent}>
+    <Modal visible={Boolean(deleteStep)} transparent animationType="slide" onRequestClose={closeDelete}><KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><View style={styles.sheet}><ScrollView contentContainerStyle={styles.sheetContent} keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} keyboardShouldPersistTaps="handled">
       <Pressable style={styles.close} onPress={closeDelete}><Text style={styles.closeText}>Close</Text></Pressable>
       {deleteStep === 'initial' ? <><Text style={styles.sheetTitle}>Delete your account?</Text><Text style={styles.copy}>Nothing will be deleted until your password and final confirmation are accepted.</Text><Button label="Continue" variant="danger" onPress={() => setDeleteStep('password')} /></> : null}
       {deleteStep === 'password' ? <><Text style={styles.sheetTitle}>Confirm your password</Text>{deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}<Input value={password} onChangeText={setPassword} secureTextEntry placeholder="Current password" /><Button label={deleteBusy ? 'Verifying…' : 'Verify password'} variant="danger" disabled={deleteBusy || !password} onPress={verifyPassword} /></> : null}
       {deleteStep === 'final' ? <><Text style={styles.sheetTitle}>Permanently delete this account</Text>{deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}<Notice tone="danger">This action is permanent and cannot be undone. You will immediately lose account access.</Notice><Text style={styles.copy}>Your profile, reviews, ratings, saved content, badges, and travel progress will be deleted. Places and photos you submitted will remain as platform-managed content under “Japan47 Community”. You will lose direct editing access; later requests must go through support and may be rejected.</Text><Field label='Type "DELETE" exactly'><Input value={confirmation} onChangeText={setConfirmation} autoCapitalize="characters" /></Field><Button label={deleteBusy ? 'Deleting…' : 'Permanently delete account'} variant="danger" disabled={deleteBusy || confirmation !== 'DELETE'} onPress={deleteAccount} /></> : null}
-    </ScrollView></View></View></Modal>
+    </ScrollView></View></KeyboardAvoidingView></Modal>
   </FormScreen>;
 }
 

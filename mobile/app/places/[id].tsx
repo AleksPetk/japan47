@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import {
   Avatar, Button, confirm, Empty, ErrorState, Eyebrow, Input, Loading, Notice,
   Rating, RemoteImage, Screen, Section,
@@ -16,7 +16,7 @@ function ActionModal({ visible, title, value, onChange, onClose, onSubmit, busy,
   visible: boolean; title: string; value: string; onChange: (value: string) => void; onClose: () => void;
   onSubmit: () => void; busy: boolean; minimum?: number; placeholder: string;
 }) {
-  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.modalCard}><Text style={styles.modalTitle}>{title}</Text><Input value={value} onChangeText={onChange} placeholder={placeholder} multiline numberOfLines={5} /><View style={styles.modalActions}><Button label="Cancel" variant="ghost" onPress={onClose} /><Button label={busy ? 'Sending…' : 'Send'} disabled={busy || value.trim().length < minimum} onPress={onSubmit} /></View></View></View></Modal>;
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><View style={styles.modalCard}><Text style={styles.modalTitle}>{title}</Text><Input value={value} onChangeText={onChange} placeholder={placeholder} multiline numberOfLines={5} /><View style={styles.modalActions}><Button label="Cancel" variant="ghost" onPress={onClose} /><Button label={busy ? 'Sending…' : 'Send'} disabled={busy || value.trim().length < minimum} onPress={onSubmit} /></View></View></KeyboardAvoidingView></Modal>;
 }
 
 function ReviewCard({ review, place, reload }: { review: Review; place: Place; reload: () => void }) {

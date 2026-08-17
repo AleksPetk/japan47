@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { PropsWithChildren, ReactNode, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, Modal, Platform, Pressable,
   RefreshControl, ScrollView, StyleProp, StyleSheet, Text, TextInput,
   TextInputProps, View, ViewStyle,
 } from 'react-native';
@@ -20,6 +20,8 @@ export function Screen({ children, refreshing = false, onRefresh, contentStyle }
   return <SafeAreaView style={styles.safe} edges={['left', 'right']}>
     <ScrollView
       contentContainerStyle={[styles.screen, contentStyle]}
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       keyboardShouldPersistTaps="handled"
       refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.red} /> : undefined}
     >{children}</ScrollView>
@@ -27,9 +29,7 @@ export function Screen({ children, refreshing = false, onRefresh, contentStyle }
 }
 
 export function FormScreen({ children }: PropsWithChildren) {
-  return <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <Screen>{children}</Screen>
-  </KeyboardAvoidingView>;
+  return <Screen>{children}</Screen>;
 }
 
 export function Eyebrow({ children, light = false }: PropsWithChildren<{ light?: boolean }>) {
