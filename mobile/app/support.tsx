@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
-import { Button, Eyebrow, Hero, Screen } from '@/components/core';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { AndroidSupportActions } from '@/components/android-support-actions';
+import { IosSupportActions } from '@/components/ios-support-actions';
+import { Eyebrow, Hero, Screen } from '@/components/core';
 import { colors, radius, shadow, spacing, typography } from '@/constants/theme';
-
-const KOFI_URL = 'https://ko-fi.com/japan47';
 
 const supportCosts = [
   { icon: 'server-outline', title: 'Hosting and infrastructure', text: 'Keeping the Japan47 website, API, and mobile experience reliable and available.' },
@@ -13,19 +13,6 @@ const supportCosts = [
 ] as const;
 
 export default function SupportJapan47Screen() {
-  const openKofi = async () => {
-    try {
-      const supported = await Linking.canOpenURL(KOFI_URL);
-      if (!supported) throw new Error('Unsupported URL');
-      await Linking.openURL(KOFI_URL);
-    } catch {
-      Alert.alert(
-        'Unable to open Ko-fi',
-        'Please try again later or open ko-fi.com/japan47 in your browser.',
-      );
-    }
-  };
-
   return <Screen>
     <Hero
       eyebrow="A free community project"
@@ -44,8 +31,7 @@ export default function SupportJapan47Screen() {
       <Eyebrow light>Entirely optional</Eyebrow>
       <Text style={styles.optionalTitle}>Japan47 stays free for everyone.</Text>
       <Text style={styles.optionalText}>Supporting Japan47 does not unlock premium content, features, badges, points, supporter status, special access, ad removal, or any other in-app benefit. Everyone receives the same Japan47 experience.</Text>
-      <Button label="Support on Ko-fi" icon="heart-outline" onPress={openKofi} />
-      <Text style={styles.externalNote}>Ko-fi opens in your device’s external browser.</Text>
+      {Platform.OS === 'ios' ? <IosSupportActions /> : <AndroidSupportActions />}
     </View>
   </Screen>;
 }
@@ -63,5 +49,4 @@ const styles = StyleSheet.create({
   optionalPanel: { gap: spacing.md, padding: spacing.xl, borderRadius: radius.lg, backgroundColor: colors.forest, ...shadow },
   optionalTitle: { color: colors.surface, fontFamily: typography.title, fontSize: 25, lineHeight: 30, fontWeight: '700' },
   optionalText: { color: '#D5DED7', fontSize: 14, lineHeight: 22 },
-  externalNote: { color: '#AEBCB2', fontSize: 11, lineHeight: 16, textAlign: 'center' },
 });
