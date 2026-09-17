@@ -46,6 +46,13 @@ const routeMetadata = {
       'Learn how to permanently delete your Japan47 account and what happens to your profile, reviews, places, and uploaded images after deletion.',
     canonicalPath: '/delete-account',
   },
+  // No public contributors directory page exists; keep this URL out of the index.
+  '/contributors': {
+    title: 'Contributors | Japan47',
+    description: 'Browse individual Japan47 contributor profiles from places and reviews.',
+    canonicalPath: '/contributors',
+    robots: 'noindex, follow',
+  },
 }
 
 const sectionLabels = {
@@ -78,16 +85,49 @@ const privateSections = new Set([
   'password-reset-success',
 ])
 
-export function getRouteMetadata(pathname) {
-  if (routeMetadata[pathname]) return routeMetadata[pathname]
+/** Normalize paths for metadata lookup (no trailing slash except homepage). */
+export function normalizeCanonicalPath(pathname = '/') {
+  if (!pathname || pathname === '/') return '/'
+  const trimmed = pathname.replace(/\/+$/, '')
+  return trimmed || '/'
+}
 
-  const [section] = pathname.split('/').filter(Boolean)
+export function getRouteMetadata(pathname) {
+  const normalized = normalizeCanonicalPath(pathname)
+  if (routeMetadata[normalized]) return routeMetadata[normalized]
+
+  const [section] = normalized.split('/').filter(Boolean)
   const label = sectionLabels[section] || 'Japan Travel Guide'
   return {
     title: `${label} | Japan47`,
     description: `Explore Japan47 ${label.toLowerCase()} travel information and community recommendations.`,
-    canonicalPath: pathname,
+    canonicalPath: normalized,
     robots: privateSections.has(section) ? 'noindex, nofollow' : 'index, follow',
+  }
+}
+
+export function buildContributorMetadata(profile) {
+  const name = profile.display_name || 'Japan47 contributor'
+  const placeCount = profile.stats?.published_place_count ?? profile.places?.length ?? 0
+  const reviewCount = profile.stats?.review_count ?? profile.reviews?.length ?? 0
+  const hasPublicContent = placeCount > 0 || reviewCount > 0
+  const parts = []
+  if (placeCount > 0) {
+    parts.push(`${placeCount} published place${placeCount === 1 ? '' : 's'}`)
+  }
+  if (reviewCount > 0) {
+    parts.push(`${reviewCount} review${reviewCount === 1 ? '' : 's'}`)
+  }
+  const activity = parts.length ? parts.join(' and ') : 'travel activity'
+  return {
+    title: `${name} — Japan47 Contributor`,
+    description: summarize(
+      `${name} on Japan47 — ${activity} across Japan’s prefectures.`,
+      `Japan47 contributor profile for ${name}.`,
+    ),
+    canonicalPath: `/contributors/${profile.id}`,
+    robots: hasPublicContent ? 'index, follow' : 'noindex, follow',
+    image: profile.profile_image_url || DEFAULT_SOCIAL_IMAGE,
   }
 }
 

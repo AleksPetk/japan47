@@ -12,4 +12,5 @@ Disallow: /login
 Disallow: /register
 Disallow: /api/
 
+# /sitemap.xml is generated dynamically by Django from published content.
 Sitemap: https://japan47.alekspetk.com/sitemap.xml

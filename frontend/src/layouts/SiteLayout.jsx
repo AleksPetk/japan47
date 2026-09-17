@@ -2,19 +2,31 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import SEO from '../components/SEO'
 import { useAuth } from '../context/AuthContext'
-import { getRouteMetadata } from '../utils/seo'
+import { getRouteMetadata, normalizeCanonicalPath } from '../utils/seo'
 
 export default function SiteLayout() {
   const [open, setOpen] = useState(false)
   const { user, logout, clearAuth } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const routeMetadata = getRouteMetadata(location.pathname)
+  const routeMetadata = getRouteMetadata(normalizeCanonicalPath(location.pathname))
   useEffect(() => {
     // Account deletion navigates to this public route before clearing the
     // context, preventing the old protected route from redirecting to login.
     if (location.state?.accountDeleted) clearAuth()
   }, [clearAuth, location.state?.accountDeleted])
+  useEffect(() => {
+    // Drop leftover homepage prerender markup when React owns a different route
+    // (spa.html fallback or client navigation). Keeps crawlers from seeing the
+    // same geography block on every non-prerendered URL after JS runs.
+    const prerender = document.getElementById('prerender-static')
+    if (!prerender) return
+    const current = normalizeCanonicalPath(location.pathname)
+    const markedPath = prerender.getAttribute('data-prerender-path')
+    if (markedPath && normalizeCanonicalPath(markedPath) === current) return
+    if (!markedPath && current === '/') return
+    prerender.remove()
+  }, [location.pathname])
   const close = () => setOpen(false)
   const handleLogout = async () => {
     close()

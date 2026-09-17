@@ -4,9 +4,11 @@ import { api } from '../api/client'
 import { PlaceCard } from '../components/Cards'
 import { EmptyState, ErrorState, LoadingState } from '../components/AsyncState'
 import Rating from '../components/Rating'
+import SEO from '../components/SEO'
 import { useApi } from '../hooks/useApi'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../utils/format'
+import { buildContributorMetadata, imageContentType } from '../utils/seo'
 
 export default function ProfilePage() {
   const { id } = useParams()
@@ -16,12 +18,22 @@ export default function ProfilePage() {
   if (loading) return <LoadingState />
   if (error) return <ErrorState error={error} />
   const badge = data.stats.badge
+  const seo = buildContributorMetadata(data)
   const toggleFollow = async () => {
     await api(`/contributors/${id}/follow/`, { method: data.is_following ? 'DELETE' : 'POST' })
     setRevision((value) => value + 1)
   }
   return (
     <article className="profile page">
+      <SEO
+        title={seo.title}
+        description={seo.description}
+        canonicalPath={seo.canonicalPath}
+        robots={seo.robots}
+        image={seo.image}
+        imageType={imageContentType(seo.image)}
+        type="profile"
+      />
       <header className="profile-hero">
         <div className="profile-identity">
           {data.profile_image_url ? (

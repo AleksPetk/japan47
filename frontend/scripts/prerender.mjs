@@ -169,14 +169,15 @@ function regionPrefectureSections() {
  * durable sr-only copy after #root so geography content remains in the document
  * after client render without changing React components or layout CSS.
  */
-function injectPrerender(html, bodyInner) {
+function injectPrerender(html, bodyInner, canonicalPath) {
   if (!/<div id="root">\s*<\/div>/i.test(html)) {
     throw new Error('Could not find empty #root in built index.html')
   }
   const trimmed = bodyInner.trim()
+  const pathAttr = escapeHtml(canonicalPath || '/')
   return html.replace(
     /<div id="root">\s*<\/div>/i,
-    `<div id="root">${trimmed}</div><div id="prerender-static" class="sr-only">${trimmed}</div>`,
+    `<div id="root">${trimmed}</div><div id="prerender-static" class="sr-only" data-prerender-path="${pathAttr}">${trimmed}</div>`,
   )
 }
 
@@ -189,22 +190,19 @@ function writePage(canonicalPath, html) {
   return outputPath
 }
 
-function writeSitemap(paths) {
-  const urls = paths
-    .map((path) => {
-      const loc = path === '/' ? `${origin}/` : `${origin}${path}`
-      return `  <url><loc>${loc}</loc></url>`
-    })
-    .join('\n')
-  writeFileSync(
-    resolve(distDir, 'sitemap.xml'),
-    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
-  )
+function writeSpaShell(template) {
+  // Clean SPA fallback for routes without dedicated prerender HTML (for example
+  // /contributors/:id). Must not include homepage prerender-static content or
+  // Google consolidates those URLs as near-duplicates of each other / home.
+  const outputPath = resolve(distDir, 'spa.html')
+  writeFileSync(outputPath, template)
+  return outputPath
 }
 
 function writeRobots() {
   // Allow Googlebot to fetch public geography and place JSON for SPA rendering;
   // keep the broader /api/ disallow so auth and private endpoints stay blocked.
+  // Sitemap is generated dynamically by Django at /sitemap.xml.
   writeFileSync(
     resolve(distDir, 'robots.txt'),
     `User-agent: *\n\nAllow: /\nAllow: /api/v1/regions/\nAllow: /api/v1/prefectures/\nAllow: /api/v1/places/\n\nDisallow: /j47-management/\nDisallow: /profile/\nDisallow: /my-travel\nDisallow: /login\nDisallow: /register\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`,
@@ -547,7 +545,7 @@ async function prerender() {
   const template = readFileSync(templatePath, 'utf8')
   const places = await fetchPublishedPlaces()
   const pages = [...buildStaticPages(), ...buildPlacePages(places)]
-  const written = []
+  const written = [writeSpaShell(template)]
 
   for (const page of pages) {
     let html = applyHead(template, {
@@ -559,7 +557,7 @@ async function prerender() {
       imageType: page.imageType,
       jsonLd: page.jsonLd,
     })
-    html = injectPrerender(html, page.body)
+    html = injectPrerender(html, page.body, page.path)
     assertSafeHtml(page.path, html)
     assertContains(page.path, html, page.required)
     if (!html.includes('id="prerender-static"')) {
@@ -568,9 +566,10 @@ async function prerender() {
     written.push(writePage(page.path, html))
   }
 
-  writeSitemap(pages.map((page) => page.path))
   writeRobots()
-  console.log(`Prerendered ${written.length} HTML pages for ${origin} (${places.length} places)`)
+  console.log(
+    `Prerendered ${written.length - 1} HTML pages plus spa.html for ${origin} (${places.length} places)`,
+  )
 }
 
 prerender().catch((error) => {
